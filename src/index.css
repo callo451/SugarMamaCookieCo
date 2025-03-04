@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-up {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 4s ease-in-out infinite;
+}
+
+/* Scroll Animations */
+.scroll-animation {
+  opacity: 0;
+}
+
+.scroll-animation.animate {
+  animation: slide-up 0.6s ease-out forwards;
+}
+
+.scroll-animation-left.animate {
+  animation: slide-in-left 0.6s ease-out forwards;
+}
+
+.scroll-animation-right.animate {
+  animation: slide-in-right 0.6s ease-out forwards;
+}
+
+.scroll-animation-scale.animate {
+  animation: scale-up 0.6s ease-out forwards;
+}
+
+/* Animation Delays */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+.delay-400 {
+  animation-delay: 400ms;
+}
+
+/* Logo styles */
+.logo-text {
+  font-family: 'Playfair Display', serif;
+  background: linear-gradient(135deg, #566c67 0%, #89a39a 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  display: inline-block;
+}
+
+.logo-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #acc0b9, transparent);
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.timeline-item {
+  opacity: 0;
+}
+
+.timeline-item.animate {
+  animation: slide-in 0.6s ease-out forwards;
+}
+
+.timeline-item:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.timeline-item:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.timeline-item:nth-child(4) {
+  animation-delay: 0.6s;
+}
