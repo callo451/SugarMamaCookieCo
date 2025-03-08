@@ -82,7 +82,7 @@ const ContactForm = () => {
               <h3 className="text-lg font-medium text-gray-900">Contact Info</h3>
               <p className="mt-2 text-gray-600">
                 Email: hello@sugarmamacookieco.com.au<br />
-                Phone: (02) 1234 5678<br />
+                Phone: +61 412 480 274<br />
                 Location: Albury-Wodonga, Australia
               </p>
             </div>
