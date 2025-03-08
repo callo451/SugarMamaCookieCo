@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { supabaseAdmin as supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 interface QuoteFormData {
   quantity: number;
@@ -9,6 +12,8 @@ interface QuoteFormData {
   shape: string;
   specialFonts: string;
   specialInstructions: string;
+  customerName: string;
+  customerEmail: string;
 }
 
 export default function QuoteBuilder() {
@@ -19,10 +24,13 @@ export default function QuoteBuilder() {
     shape: '',
     specialFonts: '',
     specialInstructions: '',
+    customerName: '',
+    customerEmail: ''
   });
   const [totalPrice, setTotalPrice] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const BASE_PRICE = 3.50;
 
@@ -58,9 +66,51 @@ export default function QuoteBuilder() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Quote submitted:', { ...formData, totalPrice });
+    setIsCalculating(true);
+
+    try {
+      // Create the order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          total_amount: totalPrice,
+          status: 'pending',
+          customer_name: formData.customerName,
+          customer_email: formData.customerEmail,
+          quantity: formData.quantity,
+          description: formData.description,
+          category: formData.category,
+          shape: formData.shape,
+          special_fonts: formData.specialFonts,
+          special_instructions: formData.specialInstructions
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create the order item
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert([{
+          order_id: orderData.id,
+          quantity: formData.quantity,
+          unit_price: BASE_PRICE,
+          description: formData.description
+        }]);
+
+      if (itemError) throw itemError;
+
+      toast.success('Quote submitted successfully! We will contact you soon.');
+      navigate('/');
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast.error('Error submitting quote. Please try again.');
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   const handleFocus = (fieldName: string) => {
@@ -118,6 +168,36 @@ export default function QuoteBuilder() {
           className="space-y-6 bg-white p-8 rounded-xl shadow-lg border border-sage-100"
           variants={containerVariants}
         >
+          <motion.div variants={itemVariants}>
+            <label htmlFor="customerName" className="block text-lg font-medium text-gray-700 mb-2">
+              Your Name
+            </label>
+            <input
+              type="text"
+              id="customerName"
+              name="customerName"
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
+              value={formData.customerName}
+              onChange={handleInputChange}
+              required
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <label htmlFor="customerEmail" className="block text-lg font-medium text-gray-700 mb-2">
+              Your Email
+            </label>
+            <input
+              type="email"
+              id="customerEmail"
+              name="customerEmail"
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
+              value={formData.customerEmail}
+              onChange={handleInputChange}
+              required
+            />
+          </motion.div>
+
           <motion.div variants={itemVariants}>
             <label htmlFor="category" className="block text-lg font-medium text-gray-700 mb-2">
               Event Category <span className="text-sm text-gray-500">(optional)</span>

@@ -9,23 +9,26 @@ interface OrderDetailsModalProps {
   order: {
     id: string;
     created_at: string;
-    customer_email: string;
-    status: string;
+    updated_at: string;
     total_amount: number;
-    shipping_address: {
-      street: string;
-      city: string;
-      state: string;
-      postal_code: string;
-      country: string;
-    };
-    order_details: {
+    status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+    customer_name: string;
+    customer_email: string;
+    quantity: number;
+    description: string;
+    category: string;
+    shape: string;
+    special_fonts: string;
+    special_instructions: string;
+    items?: {
+      id: string;
+      order_id: string;
+      created_at: string;
+      updated_at: string;
+      quantity: number;
+      unit_price: number;
       description: string;
-      category: string;
-      shape: string;
-      specialFonts: string;
-      specialInstructions: string;
-    };
+    }[];
   } | null;
   onOrderUpdated?: () => void;
   onOrderDeleted?: () => void;
@@ -35,7 +38,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editedOrder, setEditedOrder] = useState(order);
-  const [currentStatus, setCurrentStatus] = useState(order?.status || '');
+  const [currentStatus, setCurrentStatus] = useState(order?.status || 'pending');
 
   React.useEffect(() => {
     if (order) {
@@ -78,15 +81,22 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         .delete()
         .eq('order_id', order.id);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Error deleting order items:', itemsError);
+        throw itemsError;
+      }
 
       // Then delete the order
       const { error: orderError } = await supabaseAdmin
         .from('orders')
         .delete()
-        .eq('id', order.id);
+        .eq('id', order.id)
+        .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Error deleting order:', orderError);
+        throw orderError;
+      }
 
       if (onOrderDeleted) {
         onOrderDeleted();
@@ -101,59 +111,32 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-    section?: 'shipping_address' | 'order_details'
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     if (!editedOrder) return;
 
     const { name, value } = e.target;
-    
-    if (section === 'shipping_address') {
-      setEditedOrder({
-        ...editedOrder,
-        shipping_address: {
-          ...editedOrder.shipping_address,
-          [name]: value
-        }
-      });
-    } else if (section === 'order_details') {
-      setEditedOrder({
-        ...editedOrder,
-        order_details: {
-          ...editedOrder.order_details,
-          [name]: value
-        }
-      });
-    } else {
-      setEditedOrder({
-        ...editedOrder,
-        [name]: name === 'total_amount' ? parseFloat(value) : value
-      });
-    }
+    setEditedOrder({
+      ...editedOrder,
+      [name]: name === 'total_amount' ? parseFloat(value) : value
+    });
   };
 
-  const handleBlur = (section?: 'shipping_address' | 'order_details') => {
+  const handleBlur = () => {
     if (!editedOrder || !order) return;
 
-    if (section === 'shipping_address') {
-      if (JSON.stringify(editedOrder.shipping_address) !== JSON.stringify(order.shipping_address)) {
-        updateOrder({ shipping_address: editedOrder.shipping_address });
-      }
-    } else if (section === 'order_details') {
-      if (JSON.stringify(editedOrder.order_details) !== JSON.stringify(order.order_details)) {
-        updateOrder({ order_details: editedOrder.order_details });
-      }
-    } else {
-      const updates: any = {};
-      if (editedOrder.customer_email !== order.customer_email) {
-        updates.customer_email = editedOrder.customer_email;
-      }
-      if (editedOrder.total_amount !== order.total_amount) {
-        updates.total_amount = editedOrder.total_amount;
-      }
-      if (Object.keys(updates).length > 0) {
-        updateOrder(updates);
-      }
+    const updates: any = {};
+    if (editedOrder.customer_name !== order.customer_name) {
+      updates.customer_name = editedOrder.customer_name;
+    }
+    if (editedOrder.customer_email !== order.customer_email) {
+      updates.customer_email = editedOrder.customer_email;
+    }
+    if (editedOrder.total_amount !== order.total_amount) {
+      updates.total_amount = editedOrder.total_amount;
+    }
+    if (Object.keys(updates).length > 0) {
+      updateOrder(updates);
     }
   };
 
@@ -161,7 +144,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'processing':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
@@ -210,7 +193,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Order ID</h3>
-                <p className="mt-1 text-sm text-gray-900">{editedOrder.id}</p>
+                <p className="mt-1 text-sm text-gray-900">#{editedOrder.id.slice(0, 8)}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Created At</h3>
@@ -219,13 +202,24 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                 </p>
               </div>
               <div>
+                <h3 className="text-sm font-medium text-gray-500">Customer Name</h3>
+                <input
+                  type="text"
+                  name="customer_name"
+                  value={editedOrder.customer_name}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                />
+              </div>
+              <div>
                 <h3 className="text-sm font-medium text-gray-500">Customer Email</h3>
                 <input
                   type="email"
                   name="customer_email"
                   value={editedOrder.customer_email}
                   onChange={handleInputChange}
-                  onBlur={() => handleBlur()}
+                  onBlur={handleBlur}
                   className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
@@ -235,14 +229,15 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   <select
                     value={currentStatus}
                     onChange={(e) => {
-                      setCurrentStatus(e.target.value);
-                      updateOrder({ status: e.target.value });
+                      setCurrentStatus(e.target.value as typeof currentStatus);
+                      updateOrder({ status: e.target.value as typeof currentStatus });
                     }}
                     disabled={isUpdating}
                     className={`text-sm rounded-full px-2 py-1 ${getStatusColor(currentStatus)} border-0 focus:ring-2 focus:ring-sage-500`}
                   >
                     <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
@@ -258,7 +253,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   name="total_amount"
                   value={editedOrder.total_amount}
                   onChange={handleInputChange}
-                  onBlur={() => handleBlur()}
+                  onBlur={handleBlur}
                   step="0.01"
                   min="0"
                   className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
@@ -267,130 +262,88 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             </div>
 
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Shipping Address</h3>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Order Details</h3>
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500">Street</label>
-                  <input
-                    type="text"
-                    name="street"
-                    value={editedOrder.shipping_address.street}
-                    onChange={(e) => handleInputChange(e, 'shipping_address')}
-                    onBlur={() => handleBlur('shipping_address')}
+                  <label className="text-sm text-gray-500">Description</label>
+                  <textarea
+                    name="description"
+                    value={editedOrder.description}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    rows={3}
                     className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-500">City</label>
+                    <label className="text-sm text-gray-500">Category</label>
                     <input
                       type="text"
-                      name="city"
-                      value={editedOrder.shipping_address.city}
-                      onChange={(e) => handleInputChange(e, 'shipping_address')}
-                      onBlur={() => handleBlur('shipping_address')}
+                      name="category"
+                      value={editedOrder.category}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
                       className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-500">State</label>
+                    <label className="text-sm text-gray-500">Shape</label>
                     <input
                       type="text"
-                      name="state"
-                      value={editedOrder.shipping_address.state}
-                      onChange={(e) => handleInputChange(e, 'shipping_address')}
-                      onBlur={() => handleBlur('shipping_address')}
+                      name="shape"
+                      value={editedOrder.shape}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
                       className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500">Postal Code</label>
-                    <input
-                      type="text"
-                      name="postal_code"
-                      value={editedOrder.shipping_address.postal_code}
-                      onChange={(e) => handleInputChange(e, 'shipping_address')}
-                      onBlur={() => handleBlur('shipping_address')}
-                      className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500">Country</label>
-                    <input
-                      type="text"
-                      name="country"
-                      value={editedOrder.shipping_address.country}
-                      onChange={(e) => handleInputChange(e, 'shipping_address')}
-                      onBlur={() => handleBlur('shipping_address')}
-                      className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm text-gray-500">Special Fonts</label>
+                  <textarea
+                    name="special_fonts"
+                    value={editedOrder.special_fonts}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    rows={2}
+                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500">Special Instructions</label>
+                  <textarea
+                    name="special_instructions"
+                    value={editedOrder.special_instructions}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    rows={3}
+                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                  />
                 </div>
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Order Details</h3>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Description</label>
-                  <textarea
-                    name="description"
-                    value={editedOrder.order_details.description}
-                    onChange={(e) => handleInputChange(e, 'order_details')}
-                    onBlur={() => handleBlur('order_details')}
-                    rows={3}
-                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Category</label>
-                  <input
-                    type="text"
-                    name="category"
-                    value={editedOrder.order_details.category}
-                    onChange={(e) => handleInputChange(e, 'order_details')}
-                    onBlur={() => handleBlur('order_details')}
-                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Shape</label>
-                  <input
-                    type="text"
-                    name="shape"
-                    value={editedOrder.order_details.shape}
-                    onChange={(e) => handleInputChange(e, 'order_details')}
-                    onBlur={() => handleBlur('order_details')}
-                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Special Fonts</label>
-                  <input
-                    type="text"
-                    name="specialFonts"
-                    value={editedOrder.order_details.specialFonts}
-                    onChange={(e) => handleInputChange(e, 'order_details')}
-                    onBlur={() => handleBlur('order_details')}
-                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Special Instructions</label>
-                  <textarea
-                    name="specialInstructions"
-                    value={editedOrder.order_details.specialInstructions}
-                    onChange={(e) => handleInputChange(e, 'order_details')}
-                    onBlur={() => handleBlur('order_details')}
-                    rows={3}
-                    className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
+            {editedOrder.items && editedOrder.items.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Order Items</h3>
+                <div className="space-y-2">
+                  {editedOrder.items.map((item) => (
+                    <div key={item.id} className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{item.description}</p>
+                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">
+                          ${(item.unit_price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </motion.div>

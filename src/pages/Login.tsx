@@ -3,39 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Cookie, Lock, Mail, Loader2 } from 'lucide-react';
 
+interface FormEvent extends React.FormEvent {
+  preventDefault(): void;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  const setAdminStatus = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .update({
-          raw_user_meta_data: { is_admin: true }
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error setting admin status:', error);
-      return false;
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setDebugInfo([]);
 
     try {
-      // Sign in
       const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -43,25 +27,6 @@ export default function Login() {
 
       if (signInError) throw signInError;
       if (!user) throw new Error('No user returned after login');
-
-      // Check if user is admin
-      const { data: isAdmin, error: adminCheckError } = await supabase.rpc('check_is_admin');
-      
-      if (adminCheckError) throw adminCheckError;
-
-      if (!isAdmin) {
-        // Try to set admin status using the updated function
-        const { data: setAdminResult, error: setAdminError } = await supabase.rpc(
-          'set_admin_status',
-          { user_id: user.id }
-        );
-        
-        if (setAdminError) throw setAdminError;
-        
-        if (!setAdminResult) {
-          throw new Error('Failed to set admin status');
-        }
-      }
 
       // Navigate to admin page
       navigate('/admin');
@@ -139,6 +104,12 @@ export default function Login() {
               </div>
             </div>
 
+            {error && (
+              <div className="text-red-500 text-sm">
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -148,36 +119,13 @@ export default function Login() {
                        disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
-                <>
-                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                  Signing in...
-                </>
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 'Sign in'
               )}
             </button>
-
-            {error && (
-              <div className="text-red-600 text-sm mt-2">
-                {error}
-              </div>
-            )}
           </form>
         </div>
-
-        {/* Debug Information */}
-        {debugInfo.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-md shadow-lg rounded-2xl p-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Debug Information</h3>
-            <div className="space-y-2">
-              {debugInfo.map((info, index) => (
-                <div key={index} className="text-sm text-gray-600">
-                  {info}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

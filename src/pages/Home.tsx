@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star, Cookie, Palette, Sparkles, Shapes } from 'lucide-react';
+import { ArrowRight, Star, Cookie, Palette, Sparkles, Shapes, Loader2 } from 'lucide-react';
 import ContactForm from '../components/ContactForm';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
+import { supabaseAdmin as supabase } from '../lib/supabase';
+
+interface GalleryImage {
+  name: string;
+  url: string;
+  created_at: string;
+  metadata: {
+    category?: string;
+  };
+}
 
 function TimelineSection() {
   const [isVisible, setIsVisible] = React.useState(false);
@@ -116,6 +126,10 @@ function TimelineSection() {
 }
 
 export default function Home() {
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const collectionsAnimation = useScrollAnimation();
   const ctaAnimation = useScrollAnimation();
   const galleryAnimation = useScrollAnimation();
@@ -148,6 +162,70 @@ export default function Home() {
       location: 'Wodonga',
     },
   ];
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  const fetchImages = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: imageList, error: storageError } = await supabase.storage
+        .from('Gallery')
+        .list('', {
+          limit: 100, // Increased limit to get more images
+          sortBy: { column: 'name', order: 'asc' }
+        });
+
+      if (storageError) throw storageError;
+
+      if (!imageList || imageList.length === 0) {
+        setError('No images found in the gallery');
+        return;
+      }
+
+      // Filter out HEIC files and ensure we have valid image extensions
+      const validImageList = imageList.filter(file => {
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        return extension && validExtensions.includes(extension);
+      });
+
+      if (validImageList.length === 0) {
+        setError('No supported image formats found in the gallery');
+        return;
+      }
+
+      // Shuffle the valid images array
+      const shuffledImages = [...validImageList].sort(() => Math.random() - 0.5);
+
+      // Take the first 8 images after shuffling
+      const selectedImages = shuffledImages.slice(0, 8).map((file) => {
+        const { data: { publicUrl } } = supabase.storage
+          .from('Gallery')
+          .getPublicUrl(file.name);
+
+        return {
+          name: file.name,
+          url: publicUrl,
+          created_at: file.created_at,
+          metadata: file.metadata || {}
+        };
+      });
+
+      setGalleryImages(selectedImages);
+    } catch (err) {
+      console.error('Error loading gallery images:', err);
+      setError(err instanceof Error ? err.message : 'Error loading gallery images');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update the hero section image grid
+  const heroImages = galleryImages.slice(0, 4);
 
   return (
     <div className="relative">
@@ -206,38 +284,48 @@ export default function Home() {
 
             {/* Image Grid */}
             <div className="relative grid grid-cols-2 gap-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              <div className="space-y-4">
-                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                  <img
-                    src="https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476084282_122103279290754433_2545130913895948377_n.jpg"
-                    alt="Custom Cookie Design"
-                    className="w-full h-full object-cover"
-                  />
+              {loading ? (
+                <div className="col-span-2 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
-                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                  <img
-                    src="https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476184405_122103279320754433_6192895848869176951_n.jpg"
-                    alt="Custom Cookie Design"
-                    className="w-full h-full object-cover"
-                  />
+              ) : error ? (
+                <div className="col-span-2 text-center text-white">
+                  <p>{error}</p>
                 </div>
-              </div>
-              <div className="space-y-4 pt-8">
-                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                  <img
-                    src="https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476221113_122103279188754433_2092211395571903622_n.jpg"
-                    alt="Custom Cookie Design"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                  <img
-                    src="https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476231209_122103279056754433_9084296936051667971_n.jpg"
-                    alt="Custom Cookie Design"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {heroImages.slice(0, 2).map((image, index) => (
+                      <div key={index} className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
+                        <img
+                          src={image.url}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error(`Error loading image ${image.name}:`, e);
+                            e.currentTarget.src = 'https://placehold.co/600x600?text=Image+Not+Found';
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-4 pt-8">
+                    {heroImages.slice(2, 4).map((image, index) => (
+                      <div key={index} className="aspect-square rounded-2xl overflow-hidden shadow-2xl transform hover:scale-105 transition-transform duration-300">
+                        <img
+                          src={image.url}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error(`Error loading image ${image.name}:`, e);
+                            e.currentTarget.src = 'https://placehold.co/600x600?text=Image+Not+Found';
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -380,7 +468,7 @@ export default function Home() {
               <div className="relative lg:col-span-2">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#ACC0B9]/20 to-[#ACC0B9]/40 mix-blend-multiply" />
                 <img
-                  src="https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//Product%20of%20The%20Week%20with%20Photo%20Instagram%20Post%20.png"
+                  src="https://gshfksgxrvbeokyxfryk.supabase.co/storage/v1/object/public/Images//Bee%20Photo%20Product.png"
                   alt="Custom Cookie Design"
                   className="h-full w-full object-cover"
                 />
@@ -445,62 +533,39 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476084282_122103279290754433_2545130913895948377_n.jpg",
-                alt: "Custom Cookie Design 1"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476184405_122103279320754433_6192895848869176951_n.jpg",
-                alt: "Custom Cookie Design 2"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476221113_122103279188754433_2092211395571903622_n.jpg",
-                alt: "Custom Cookie Design 3"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476231209_122103279056754433_9084296936051667971_n.jpg",
-                alt: "Custom Cookie Design 4"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476232206_122103279068754433_3242185640612748068_n.jpg",
-                alt: "Custom Cookie Design 5"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476240340_122103279062754433_6475160474282416623_n.jpg",
-                alt: "Custom Cookie Design 6"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476240340_122103279062754433_6475160474282416623_n.jpg",
-                alt: "Custom Cookie Design 7"
-              },
-              {
-                src: "https://mmjrwzctgmyvgqiwfnyc.supabase.co/storage/v1/object/public/images//476806467_122103279182754433_3829592989129397920_n.jpg",
-                alt: "Custom Cookie Design 8"
-              }
-            ].map((image, index) => (
-              <div
-                key={index}
-                className={`relative group overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-300 scroll-animation-scale ${
-                  galleryAnimation.isVisible ? 'animate' : ''
-                }`}
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className="aspect-square">
-                  <img
-                    src={image.src}
-                    alt={image.alt}
-                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300" />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <span className="text-white text-sm font-medium bg-black bg-opacity-50 px-4 py-2 rounded-full backdrop-blur-sm">
-                      {image.alt}
-                    </span>
+            {loading ? (
+              <div className="col-span-full flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 text-sage-600 animate-spin" />
+              </div>
+            ) : error ? (
+              <div className="col-span-full text-center text-red-600 py-12">
+                <p>{error}</p>
+              </div>
+            ) : (
+              galleryImages.map((image, index) => (
+                <div
+                  key={index}
+                  className={`relative group overflow-hidden rounded-lg shadow-sm hover:shadow-md transition-all duration-300 scroll-animation-scale ${
+                    galleryAnimation.isVisible ? 'animate' : ''
+                  }`}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="aspect-square">
+                    <img
+                      src={image.url}
+                      alt={image.name}
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <span className="text-white text-sm font-medium bg-black bg-opacity-50 px-4 py-2 rounded-full backdrop-blur-sm">
+                        {image.metadata.category || 'Custom Design'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -514,80 +579,8 @@ export default function Home() {
           <h2 className={`text-3xl font-extrabold text-gray-900 text-center mb-12 scroll-animation ${
             testimonialsAnimation.isVisible ? 'animate' : ''
           }`}>
-            Customer Love
+            What Our Customers Say
           </h2>
-          
-          {/* Review Submission Form */}
-          <div className={`mb-16 max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-[#ACC0B9]/20 scroll-animation ${
-            testimonialsAnimation.isVisible ? 'animate' : ''
-          }`}>
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Share Your Experience</h3>
-            <p className="text-gray-600 mb-6">
-              Leave a review and get 10% off your next order! Your discount code will be emailed to you after submission.
-            </p>
-            <form className="space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  className="mt-1 block w-full rounded-md border-[#ACC0B9] shadow-sm focus:border-[#ACC0B9] focus:ring-[#ACC0B9] sm:text-sm"
-                  placeholder="Your name"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  id="email"
-                  className="mt-1 block w-full rounded-md border-[#ACC0B9] shadow-sm focus:border-[#ACC0B9] focus:ring-[#ACC0B9] sm:text-sm"
-                  placeholder="your@email.com"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="review" className="block text-sm font-medium text-gray-700">
-                  Your Review
-                </label>
-                <textarea
-                  name="review"
-                  id="review"
-                  rows={4}
-                  className="mt-1 block w-full rounded-md border-[#ACC0B9] shadow-sm focus:border-[#ACC0B9] focus:ring-[#ACC0B9] sm:text-sm"
-                  placeholder="Share your experience with our cookies..."
-                />
-              </div>
-
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  {[...Array(5)].map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="text-gray-300 hover:text-yellow-400 focus:outline-none"
-                    >
-                      <Star className="h-6 w-6" />
-                    </button>
-                  ))}
-                </div>
-                <span className="ml-3 text-sm text-gray-500">Click to rate</span>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#ACC0B9] hover:bg-[#9BB0A9] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ACC0B9]"
-              >
-                Submit Review & Get 10% Off
-              </button>
-            </form>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {testimonials.map((testimonial, index) => (

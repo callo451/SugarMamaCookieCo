@@ -1,42 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Package, ShoppingBag, Download, Filter, Search, Calendar, ArrowUpDown, Users as UsersIcon, BarChart, DollarSign, Plus, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Package, ShoppingBag, Download, Filter, Search, Calendar, ArrowUpDown, Users as UsersIcon, BarChart, DollarSign, Plus, Trash2, LogOut } from 'lucide-react';
+import { supabaseAdmin } from '../lib/supabase';
 import OrderModal from '../components/OrderModal';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 
 interface Order {
   id: string;
-  customer_email: string;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
-  total_amount: number;
-  shipping_address: {
-    street: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
-  };
   created_at: string;
-  items: OrderItem[];
-  order_details: {
-    description: string;
-    category: string;
-    shape: string;
-    specialFonts: string;
-    specialInstructions: string;
-  };
+  updated_at: string;
+  total_amount: number;
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  customer_name: string;
+  customer_email: string;
+  quantity: number;
+  description: string;
+  category: string;
+  shape: string;
+  special_fonts: string;
+  special_instructions: string;
+  items?: OrderItem[];
 }
 
 interface OrderItem {
   id: string;
-  product_id: string;
+  order_id: string;
+  created_at: string;
+  updated_at: string;
   quantity: number;
-  price_at_time: number;
-  product: {
-    name: string;
-    image_url: string;
-  };
+  unit_price: number;
+  description: string;
 }
 
 type SortField = 'created_at' | 'total_amount' | 'status';
@@ -47,12 +40,11 @@ interface Analytics {
   totalOrders: number;
   uniqueCustomers: number;
   avgOrderValue: number;
-  revenueGrowth: number;
-  orderGrowth: number;
 }
 
 export default function Orders() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,9 +60,7 @@ export default function Orders() {
     totalRevenue: 0,
     totalOrders: 0,
     uniqueCustomers: 0,
-    avgOrderValue: 0,
-    revenueGrowth: 0,
-    orderGrowth: 0
+    avgOrderValue: 0
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -84,64 +74,35 @@ export default function Orders() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      let query = supabaseAdmin
         .from('orders')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order(sortField, { ascending: sortDirection === 'asc' });
 
       // Apply filters if they exist
       if (searchQuery) {
-        query = query.ilike('customer_email', `%${searchQuery}%`);
+        query = query.or(`customer_email.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
       }
       if (selectedStatus && selectedStatus.length > 0) {
         query = query.in('status', selectedStatus);
       }
-      if (dateRange) {
-        if (dateRange[0]) {
-          query = query.gte('created_at', dateRange[0].toISOString());
-        }
-        if (dateRange[1]) {
-          query = query.lte('created_at', dateRange[1].toISOString());
-        }
+      if (dateRange[0]) {
+        query = query.gte('created_at', dateRange[0].toISOString());
+      }
+      if (dateRange[1]) {
+        query = query.lte('created_at', dateRange[1].toISOString());
       }
       if (minAmount) {
-        query = query.gte('total_amount', minAmount);
+        query = query.gte('total_amount', parseFloat(minAmount));
       }
       if (maxAmount) {
-        query = query.lte('total_amount', maxAmount);
+        query = query.lte('total_amount', parseFloat(maxAmount));
       }
 
-      const { data: ordersData, error: ordersError } = await query;
+      const { data, error } = await query;
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        throw ordersError;
-      }
-
-      // Fetch order items for each order
-      const ordersWithItems = await Promise.all(
-        ordersData.map(async (order) => {
-          const { data: items, error: itemsError } = await supabase
-            .from('order_items')
-            .select(`
-              *,
-              product:products(*)
-            `)
-            .eq('order_id', order.id);
-
-          if (itemsError) {
-            console.error('Error fetching order items:', itemsError);
-            return order;
-          }
-
-          return {
-            ...order,
-            items: items || []
-          };
-        })
-      );
-
-      setOrders(ordersWithItems);
+      if (error) throw error;
+      setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -149,33 +110,41 @@ export default function Orders() {
     }
   };
 
+  const fetchOrderItems = async (orderId: string) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching order items:', error);
+      return [];
+    }
+  };
+
   const fetchAnalytics = async () => {
     try {
-      // Get completed orders
-      const { data: completedOrders, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('orders')
-        .select('total_amount, created_at, customer_email')
+        .select('total_amount, customer_email')
         .eq('status', 'completed');
 
-      if (error) {
-        console.error('Error fetching analytics:', error);
-        throw error;
+      if (error) throw error;
+
+      if (data) {
+        const totalRevenue = data.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        const uniqueCustomers = new Set(data.map(order => order.customer_email)).size;
+        
+        setAnalytics({
+          totalRevenue,
+          totalOrders: data.length,
+          uniqueCustomers,
+          avgOrderValue: data.length > 0 ? totalRevenue / data.length : 0
+        });
       }
-
-      // Calculate analytics
-      const totalRevenue = completedOrders?.reduce((sum, order) => sum + order.total_amount, 0) || 0;
-      const totalOrders = completedOrders?.length || 0;
-      const uniqueCustomers = new Set(completedOrders?.map(order => order.customer_email)).size;
-      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-      setAnalytics({
-        totalRevenue,
-        totalOrders,
-        uniqueCustomers,
-        avgOrderValue,
-        revenueGrowth: 0,
-        orderGrowth: 0
-      });
     } catch (error) {
       console.error('Error fetching analytics:', error);
     }
@@ -198,8 +167,8 @@ export default function Orders() {
       'Email': order.customer_email,
       'Status': order.status,
       'Total': order.total_amount.toFixed(2),
-      'Items': order.items.map(item => `${item.quantity}x ${item.product.name}`).join(', '),
-      'Shipping Address': `${order.shipping_address.street}, ${order.shipping_address.city}, ${order.shipping_address.state} ${order.shipping_address.postal_code}, ${order.shipping_address.country}`
+      'Items': order.description,
+      'Shipping Address': ''
     }));
 
     const headers = Object.keys(csvData[0]) as (keyof OrderCSV)[];
@@ -220,14 +189,14 @@ export default function Orders() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-AU', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'AUD',
     }).format(amount);
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString('en-AU', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -240,7 +209,7 @@ export default function Orders() {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'processing':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
@@ -251,36 +220,11 @@ export default function Orders() {
     }
   };
 
-  const stats = [
-    {
-      name: 'Total Revenue',
-      value: `$${analytics.totalRevenue?.toFixed(2) || '0.00'}`,
-      icon: DollarSign,
-      change: `${analytics.revenueGrowth?.toFixed(1) || '0'}%`,
-      changeType: analytics.revenueGrowth > 0 ? 'positive' : 'negative',
-    },
-    {
-      name: 'Total Orders',
-      value: analytics.totalOrders?.toString() || '0',
-      icon: Package,
-      change: `${analytics.orderGrowth?.toFixed(1) || '0'}%`,
-      changeType: analytics.orderGrowth > 0 ? 'positive' : 'negative',
-    },
-    {
-      name: 'Total Customers',
-      value: analytics.uniqueCustomers?.toString() || '0', 
-      icon: UsersIcon,
-      change: 'Lifetime',
-      changeType: 'neutral',
-    },
-    {
-      name: 'Average Order Value',
-      value: `$${analytics.avgOrderValue?.toFixed(2) || '0.00'}`,
-      icon: BarChart,
-      change: 'Per Order',
-      changeType: 'neutral',
-    },
-  ];
+  const handleOrderClick = async (order: Order) => {
+    const items = await fetchOrderItems(order.id);
+    setSelectedOrder({ ...order, items });
+    setIsDetailsModalOpen(true);
+  };
 
   const deleteSelectedOrders = async () => {
     if (!window.confirm(`Are you sure you want to delete ${selectedOrderIds.length} orders? This action cannot be undone.`)) {
@@ -290,29 +234,40 @@ export default function Orders() {
     setLoading(true);
     try {
       // Delete order items first
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await supabaseAdmin
         .from('order_items')
         .delete()
-        .in('order_id', selectedOrderIds);
+        .eq('order_id', selectedOrderIds[0]);
 
       if (itemsError) throw itemsError;
 
-      // Then delete the orders
-      const { error: ordersError } = await supabase
+      // Then delete the order
+      const { error: ordersError } = await supabaseAdmin
         .from('orders')
         .delete()
-        .in('id', selectedOrderIds);
+        .eq('id', selectedOrderIds[0]);
 
       if (ordersError) throw ordersError;
 
       setSelectedOrderIds([]);
-      fetchOrders();
-      fetchAnalytics();
+      await fetchOrders();
+      await fetchAnalytics();
     } catch (error) {
       console.error('Error deleting orders:', error);
       alert('Failed to delete orders. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabaseAdmin.auth.signOut();
+      if (error) throw error;
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      alert('Failed to log out. Please try again.');
     }
   };
 
@@ -346,35 +301,55 @@ export default function Orders() {
               <Download className="h-4 w-4 mr-2" />
               Export Orders
             </button>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </button>
           </div>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => (
-          <div
-            key={stat.name}
-            className="bg-white p-6 rounded-lg shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-2 bg-sage-50 rounded-lg">
-                <stat.icon className="h-6 w-6 text-sage-600" />
-              </div>
-              <span
-                className={`text-sm font-medium ${
-                  stat.changeType === 'positive' ? 'text-green-600' : 
-                  stat.changeType === 'negative' ? 'text-red-600' : 
-                  'text-gray-600'
-                }`}
-              >
-                {stat.change}
-              </span>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Revenue</p>
+              <p className="text-2xl font-semibold">{formatCurrency(analytics.totalRevenue)}</p>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
-            <p className="text-gray-600 text-sm">{stat.name}</p>
+            <DollarSign className="h-8 w-8 text-green-500" />
           </div>
-        ))}
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Orders</p>
+              <p className="text-2xl font-semibold">{analytics.totalOrders}</p>
+            </div>
+            <ShoppingBag className="h-8 w-8 text-blue-500" />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Unique Customers</p>
+              <p className="text-2xl font-semibold">{analytics.uniqueCustomers}</p>
+            </div>
+            <UsersIcon className="h-8 w-8 text-purple-500" />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Average Order Value</p>
+              <p className="text-2xl font-semibold">{formatCurrency(analytics.avgOrderValue)}</p>
+            </div>
+            <BarChart className="h-8 w-8 text-orange-500" />
+          </div>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -427,7 +402,7 @@ export default function Orders() {
                   Status
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {['pending', 'processing', 'completed', 'cancelled'].map((status) => (
+                  {['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((status) => (
                     <button
                       key={status}
                       onClick={() => {
@@ -554,6 +529,7 @@ export default function Orders() {
                 <tr 
                   key={order.id} 
                   className="hover:bg-gray-50 cursor-pointer" 
+                  onClick={() => handleOrderClick(order)}
                 >
                   <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     <input
@@ -569,37 +545,13 @@ export default function Orders() {
                       className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
                     />
                   </td>
-                  <td className="px-6 py-4" onClick={() => {
-                    setSelectedOrder(order);
-                    setIsDetailsModalOpen(true);
-                  }}>
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        {order.items[0]?.product.image_url && (
-                          <img
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={order.items[0].product.image_url}
-                            alt=""
-                          />
-                        )}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          Order #{order.id.slice(0, 8)}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {order.items.length} items
-                        </div>
-                      </div>
-                    </div>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-gray-900">#{order.id.slice(0, 8)}</div>
+                    <div className="text-sm text-gray-500">{order.description}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {order.customer_email}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Customer
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
+                    <div className="text-sm text-gray-500">{order.customer_email}</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>

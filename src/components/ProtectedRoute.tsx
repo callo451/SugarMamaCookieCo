@@ -3,42 +3,28 @@ import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-interface AdminProtectedRouteProps {
+interface ProtectedRouteProps {
   children: ReactNode;
 }
 
-export default function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAuth = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-          setIsAdmin(false);
-          return;
-        }
-
-        const { data, error } = await supabase.rpc('check_is_admin');
-
-        if (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-          return;
-        }
-
-        setIsAdmin(!!data);
+        setIsAuthenticated(!!user);
       } catch (error) {
-        console.error('Error in checkAdmin:', error);
-        setIsAdmin(false);
+        console.error('Error in checkAuth:', error);
+        setIsAuthenticated(false);
       }
     };
 
-    checkAdmin();
+    checkAuth();
   }, []);
 
-  if (isAdmin === null) {
+  if (isAuthenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-sage-50/50 to-white">
         <div className="text-center">
@@ -49,7 +35,7 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
     );
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 

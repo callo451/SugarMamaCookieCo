@@ -10,38 +10,26 @@ interface OrderModalProps {
 }
 
 interface OrderFormData {
+  customer_name: string;
+  customer_email: string;
   quantity: number;
   description: string;
   category: string;
   shape: string;
-  specialFonts: string;
-  specialInstructions: string;
-  customerEmail: string;
-  shippingAddress: {
-    street: string;
-    city: string;
-    state: string;
-    postal_code: string;
-    country: string;
-  };
+  special_fonts: string;
+  special_instructions: string;
 }
 
 export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderModalProps) {
   const [formData, setFormData] = useState<OrderFormData>({
+    customer_name: '',
+    customer_email: '',
     quantity: 1,
     description: '',
     category: '',
     shape: '',
-    specialFonts: '',
-    specialInstructions: '',
-    customerEmail: '',
-    shippingAddress: {
-      street: '',
-      city: '',
-      state: '',
-      postal_code: '',
-      country: ''
-    }
+    special_fonts: '',
+    special_instructions: ''
   });
   const [totalPrice, setTotalPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -65,21 +53,10 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    if (name.startsWith('shipping_')) {
-      const field = name.replace('shipping_', '');
-      setFormData(prev => ({
-        ...prev,
-        shippingAddress: {
-          ...prev.shippingAddress,
-          [field]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: name === 'quantity' ? Math.max(1, parseInt(value) || 1) : value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'quantity' ? Math.max(1, parseInt(value) || 1) : value
+    }));
 
     if (name === 'quantity') {
       setTotalPrice(calculatePrice(parseInt(value) || 1));
@@ -91,21 +68,20 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
     setIsSubmitting(true);
 
     try {
-      // Create the order first
+      // Create the order
       const { data: orderData, error: orderError } = await supabaseAdmin
         .from('orders')
         .insert([{
-          customer_email: formData.customerEmail,
+          customer_name: formData.customer_name,
+          customer_email: formData.customer_email,
           status: 'pending',
           total_amount: totalPrice,
-          shipping_address: formData.shippingAddress,
-          order_details: {
-            description: formData.description,
-            category: formData.category,
-            shape: formData.shape,
-            specialFonts: formData.specialFonts,
-            specialInstructions: formData.specialInstructions
-          }
+          quantity: formData.quantity,
+          description: formData.description,
+          category: formData.category,
+          shape: formData.shape,
+          special_fonts: formData.special_fonts,
+          special_instructions: formData.special_instructions
         }])
         .select()
         .single();
@@ -114,50 +90,20 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
         throw orderError;
       }
 
-      // Attempt to create/get product and order items, but don't let failures stop the process
-      try {
-        let productId;
-        const { data: existingProduct } = await supabaseAdmin
-          .from('products')
-          .select('id')
-          .eq('name', 'Custom Cookie')
-          .single();
+      // Create the order item
+      const { error: itemError } = await supabaseAdmin
+        .from('order_items')
+        .insert([{
+          order_id: orderData.id,
+          quantity: formData.quantity,
+          unit_price: BASE_PRICE,
+          description: formData.description
+        }]);
 
-        if (existingProduct) {
-          productId = existingProduct.id;
-        } else {
-          const { data: newProduct } = await supabaseAdmin
-            .from('products')
-            .insert([{
-              name: 'Custom Cookie',
-              description: 'Custom designed cookie',
-              price: BASE_PRICE,
-              image_url: '/images/custom-cookie.jpg'
-            }])
-            .select('id')
-            .single();
-
-          if (newProduct) {
-            productId = newProduct.id;
-          }
-        }
-
-        if (productId) {
-          await supabaseAdmin
-            .from('order_items')
-            .insert([{
-              order_id: orderData.id,
-              product_id: productId,
-              quantity: formData.quantity,
-              price_at_time: BASE_PRICE
-            }]);
-        }
-      } catch (productError) {
-        // Just log the error and continue - the order was still created successfully
-        console.log('Note: Product/order items creation had an issue:', productError);
+      if (itemError) {
+        console.error('Error creating order item:', itemError);
       }
 
-      // Order was created successfully
       onOrderCreated();
       onClose();
     } catch (error) {
@@ -190,18 +136,33 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Email *
-              </label>
-              <input
-                type="email"
-                name="customerEmail"
-                required
-                value={formData.customerEmail}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name *
+                </label>
+                <input
+                  type="text"
+                  name="customer_name"
+                  required
+                  value={formData.customer_name}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Email *
+                </label>
+                <input
+                  type="email"
+                  name="customer_email"
+                  required
+                  value={formData.customer_email}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -281,8 +242,8 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
                 Special Fonts or Text
               </label>
               <textarea
-                name="specialFonts"
-                value={formData.specialFonts}
+                name="special_fonts"
+                value={formData.special_fonts}
                 onChange={handleInputChange}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
@@ -295,84 +256,13 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
                 Special Instructions
               </label>
               <textarea
-                name="specialInstructions"
-                value={formData.specialInstructions}
+                name="special_instructions"
+                value={formData.special_instructions}
                 onChange={handleInputChange}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
                 placeholder="Any special instructions or requests..."
               />
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Shipping Address *</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Street Address
-                  </label>
-                  <input
-                    type="text"
-                    name="shipping_street"
-                    required
-                    value={formData.shippingAddress.street}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    name="shipping_city"
-                    required
-                    value={formData.shippingAddress.city}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    name="shipping_state"
-                    required
-                    value={formData.shippingAddress.state}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Postal Code
-                  </label>
-                  <input
-                    type="text"
-                    name="shipping_postal_code"
-                    required
-                    value={formData.shippingAddress.postal_code}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Country
-                  </label>
-                  <input
-                    type="text"
-                    name="shipping_country"
-                    required
-                    value={formData.shippingAddress.country}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
-                  />
-                </div>
-              </div>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg">
