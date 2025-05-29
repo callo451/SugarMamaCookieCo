@@ -163,7 +163,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
       >
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">

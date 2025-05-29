@@ -86,7 +86,7 @@ export default function QuoteBuilder() {
           special_fonts: formData.specialFonts,
           special_instructions: formData.specialInstructions
         }])
-        .select()
+        .select('*, display_order_id')
         .single();
 
       if (orderError) throw orderError;
@@ -102,6 +102,83 @@ export default function QuoteBuilder() {
         }]);
 
       if (itemError) throw itemError;
+
+      // Prepare payload for admin new order alert
+      const adminAlertPayload = {
+        orderData: {
+          order_id: orderData.id, // The UUID for internal reference
+          order_number: orderData.display_order_id, // The new human-readable order number
+          customer_name: orderData.customer_name, // From DB
+          customer_email: orderData.customer_email, // From DB
+          created_at: orderData.created_at, // From DB
+          total_amount: orderData.total_amount, // From DB
+          delivery_option: "N/A - Quote Builder", // Placeholder
+          notes: orderData.special_instructions || "No special instructions provided.", // From DB
+          items: [
+            {
+              product_name: orderData.description, // Main description from the order
+              quantity: orderData.quantity,       // Main quantity from the order
+              unit_price: orderData.total_amount / orderData.quantity // Calculate unit price if possible
+            }
+          ]
+        }
+      };
+
+      // Send admin new order alert
+      try {
+        console.log('Attempting to send admin new order alert for quote/order ID:', orderData.id);
+        const { data: alertData, error: alertError } = await supabase.functions.invoke(
+          'send-admin-new-order-alert',
+          { body: adminAlertPayload }
+        );
+
+        if (alertError) {
+          console.error('Error sending admin new order alert from QuoteBuilder:', alertError);
+        } else {
+          console.log('Admin new order alert from QuoteBuilder sent successfully:', alertData);
+        }
+      } catch (e) {
+        console.error('Exception when trying to send admin new order alert from QuoteBuilder:', e);
+      }
+
+      // Prepare payload for customer order confirmation email
+      const customerNotificationPayload = {
+        orderData: {
+          order_id: orderData.id, // UUID
+          order_number: orderData.display_order_id, // Human-readable QUXXX number
+          customer_name: orderData.customer_name,
+          customer_email: orderData.customer_email,
+          created_at: orderData.created_at,
+          total_amount: orderData.total_amount,
+          // delivery_option: orderData.delivery_option, // QuoteBuilder doesn't have this
+          // notes: orderData.special_instructions, 
+          items: [
+            {
+              product_name: orderData.description, 
+              quantity: orderData.quantity,       
+              unit_price: orderData.total_amount / orderData.quantity, // Or BASE_PRICE if more appropriate
+              total_price: orderData.total_amount
+            }
+          ]
+        }
+      };
+
+      // Send customer order confirmation email
+      try {
+        console.log('Attempting to send customer order confirmation from QuoteBuilder for order ID:', orderData.id);
+        const { data: customerEmailData, error: customerEmailError } = await supabase.functions.invoke(
+          'send-order-notification',
+          { body: customerNotificationPayload }
+        );
+
+        if (customerEmailError) {
+          console.error('Error sending customer order confirmation email from QuoteBuilder:', customerEmailError);
+        } else {
+          console.log('Customer order confirmation email from QuoteBuilder sent successfully:', customerEmailData);
+        }
+      } catch (e) {
+        console.error('Exception when trying to send customer order confirmation email from QuoteBuilder:', e);
+      }
 
       toast.success('Quote submitted successfully! We will contact you soon.');
       navigate('/');

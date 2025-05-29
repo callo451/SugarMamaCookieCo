@@ -83,7 +83,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
           special_fonts: formData.special_fonts,
           special_instructions: formData.special_instructions
         }])
-        .select()
+        .select('*, display_order_id')
         .single();
 
       if (orderError) {
@@ -102,6 +102,85 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
 
       if (itemError) {
         console.error('Error creating order item:', itemError);
+      }
+
+      // Prepare payload for admin new order alert
+      const adminAlertPayload = {
+        orderData: {
+          order_id: orderData.id, // The UUID for internal reference
+          order_number: orderData.display_order_id, // The new human-readable order number
+          customer_name: orderData.customer_name, // From DB
+          customer_email: orderData.customer_email, // From DB
+          created_at: orderData.created_at, // From DB
+          total_amount: orderData.total_amount, // From DB
+          delivery_option: "N/A - Order Modal", // Placeholder, OrderModal doesn't have this field directly
+          notes: orderData.special_instructions || "No special instructions provided.", // From DB
+          items: [
+            {
+              product_name: orderData.description, // Main description from the order
+              quantity: orderData.quantity,       // Main quantity from the order
+              unit_price: orderData.total_amount / orderData.quantity // Calculate unit price if possible, or use a fixed one
+            }
+          ]
+        }
+      };
+
+      // Send admin new order alert
+      try {
+        console.log('Attempting to send admin new order alert for order ID:', orderData.id);
+        const { data: alertData, error: alertError } = await supabaseAdmin.functions.invoke(
+          'send-admin-new-order-alert',
+          { body: adminAlertPayload }
+        );
+
+        if (alertError) {
+          console.error('Error sending admin new order alert:', alertError);
+          // Non-critical error, so we don't throw or stop the user flow
+        } else {
+          console.log('Admin new order alert sent successfully:', alertData);
+        }
+      } catch (e) {
+        console.error('Exception when trying to send admin new order alert:', e);
+      }
+
+      // Prepare payload for customer order confirmation email
+      const customerNotificationPayload = {
+        orderData: {
+          order_id: orderData.id, // UUID
+          order_number: orderData.display_order_id, // Human-readable QUXXX number
+          customer_name: orderData.customer_name,
+          customer_email: orderData.customer_email,
+          created_at: orderData.created_at,
+          total_amount: orderData.total_amount,
+          // delivery_option: orderData.delivery_option, // OrderModal doesn't have this
+          // notes: orderData.special_instructions, // Customer notes might not be needed in their confirmation, or could be added
+          items: [
+            {
+              product_name: orderData.description, 
+              quantity: orderData.quantity,       
+              unit_price: orderData.total_amount / orderData.quantity, // Or BASE_PRICE if more appropriate
+              total_price: orderData.total_amount
+            }
+          ]
+        }
+      };
+
+      // Send customer order confirmation email
+      try {
+        console.log('Attempting to send customer order confirmation for order ID:', orderData.id);
+        const { data: customerEmailData, error: customerEmailError } = await supabaseAdmin.functions.invoke(
+          'send-order-notification',
+          { body: customerNotificationPayload }
+        );
+
+        if (customerEmailError) {
+          console.error('Error sending customer order confirmation email:', customerEmailError);
+          // Non-critical, don't stop user flow
+        } else {
+          console.log('Customer order confirmation email sent successfully:', customerEmailData);
+        }
+      } catch (e) {
+        console.error('Exception when trying to send customer order confirmation email:', e);
       }
 
       onOrderCreated();
