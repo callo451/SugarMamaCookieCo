@@ -193,7 +193,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Order ID</h3>
-                <p className="mt-1 text-sm text-gray-900">#{editedOrder.id.slice(0, 8)}</p>
+                <p className="mt-1 text-sm text-gray-900">#{(editedOrder as any).display_order_id ?? editedOrder.id.slice(0, 8)}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Created At</h3>
