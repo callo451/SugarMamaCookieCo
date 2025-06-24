@@ -4,6 +4,7 @@ import { ShoppingBag, Download, Filter, Search, ArrowUpDown, BarChart, DollarSig
 import { supabase, supabaseAdmin } from '../lib/supabase';
 import OrderModal from '../components/OrderModal';
 import OrderDetailsModal from '../components/OrderDetailsModal';
+import PricingSettingsModal from '../components/PricingSettingsModal';
 
 interface Order {
   id: string;
@@ -77,6 +78,7 @@ export default function Orders() {
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   // Default order confirmation template with placeholders
   const DEFAULT_ORDER_CONFIRMATION_TEMPLATE = `
@@ -1042,6 +1044,22 @@ export default function Orders() {
           </div>
         </div>
       )}
+    {/* Pricing Settings Button */}
+      <button
+        type="button"
+        onClick={() => setIsPricingModalOpen(true)}
+        className="fixed bottom-4 right-4 bg-sage-600 text-white px-4 py-2 rounded-md shadow-lg hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500"
+      >
+        Pricing Settings
+      </button>
+      <PricingSettingsModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+        onSaved={() => {
+          fetchOrders();
+          fetchAnalytics();
+        }}
+      />
     </div>
   );
 }

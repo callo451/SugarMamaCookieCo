@@ -32,21 +32,49 @@ export default function QuoteBuilder() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const BASE_PRICE = 3.50;
+  // Pricing settings fetched from Supabase (fallback to defaults until loaded)
+  const DEFAULT_SETTINGS = { base_price: 3.5, discount_12: 0.1, discount_24: 0.2, discount_50: 0.3 };
+  const [pricingSettings, setPricingSettings] = useState<typeof DEFAULT_SETTINGS | null>(null);
+
+  // Fetch pricing settings once on mount
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from('pricing_settings')
+        .select('*')
+        .limit(1)
+        .single();
+      if (!error && data) {
+        setPricingSettings(data);
+      }
+    })();
+  }, []);
+
+
+  // Helper to access current base price
+  const getBasePrice = () => (pricingSettings?.base_price ?? DEFAULT_SETTINGS.base_price);
 
   const calculateBulkDiscount = (quantity: number): number => {
-    if (quantity >= 50) return 0.30;
-    if (quantity >= 24) return 0.20;
-    if (quantity >= 12) return 0.10;
+    const settings = pricingSettings ?? DEFAULT_SETTINGS;
+    if (quantity >= 50) return settings.discount_50;
+    if (quantity >= 24) return settings.discount_24;
+    if (quantity >= 12) return settings.discount_12;
     return 0;
   };
 
-  const calculatePrice = (quantity: number): number => {
+  // Calculate the discounted price per cookie (rounded to 2dp)
+  const calculateUnitPrice = (quantity: number): number => {
     const discount = calculateBulkDiscount(quantity);
-    const pricePerCookie = BASE_PRICE * (1 - discount);
-    return Number((quantity * pricePerCookie).toFixed(2));
+    const basePrice = getBasePrice();
+    return Number((basePrice * (1 - discount)).toFixed(2));
   };
 
+  // Calculate total price based on quantity (rounded to 2dp). Uses the helper above.
+  const calculatePrice = (quantity: number): number => {
+    return Number((quantity * calculateUnitPrice(quantity)).toFixed(2));
+  };
+
+  // Recalculate total whenever quantity changes with a short debounce for UX smoothness
   useEffect(() => {
     setIsCalculating(true);
     const timer = setTimeout(() => {
@@ -54,16 +82,30 @@ export default function QuoteBuilder() {
       setIsCalculating(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [formData.quantity]);
+  }, [formData.quantity, pricingSettings]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'quantity' ? Math.max(1, parseInt(value) || 1) : value,
-    }));
+
+    // For quantity, ignore non-numeric input to avoid NaN state
+    if (name === 'quantity') {
+      // Allow clearing the field
+      if (value === '') {
+        setFormData((prev) => ({ ...prev, quantity: 0 }));
+        return;
+      }
+      // Accept digits only
+      if (!/^\d+$/.test(value)) {
+        return; // ignore invalid character
+      }
+      setFormData((prev) => ({ ...prev, quantity: parseInt(value, 10) }));
+      return;
+    }
+
+    // Default handler for other fields
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,11 +113,15 @@ export default function QuoteBuilder() {
     setIsCalculating(true);
 
     try {
+      // Ensure we have the latest price at the moment of submission (avoids stale state)
+      const latestTotalPrice = calculatePrice(formData.quantity);
+      setTotalPrice(latestTotalPrice);
+
       // Create the order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{
-          total_amount: totalPrice,
+          total_amount: latestTotalPrice,
           status: 'pending',
           customer_name: formData.customerName,
           customer_email: formData.customerEmail,
@@ -97,7 +143,7 @@ export default function QuoteBuilder() {
         .insert([{
           order_id: orderData.id,
           quantity: formData.quantity,
-          unit_price: BASE_PRICE,
+          unit_price: calculateUnitPrice(formData.quantity),
           description: formData.description
         }]);
 
@@ -118,7 +164,7 @@ export default function QuoteBuilder() {
             {
               product_name: orderData.description, // Main description from the order
               quantity: orderData.quantity,       // Main quantity from the order
-              unit_price: orderData.total_amount / orderData.quantity // Calculate unit price if possible
+              unit_price: calculateUnitPrice(orderData.quantity)
             }
           ]
         }
@@ -156,7 +202,7 @@ export default function QuoteBuilder() {
             {
               product_name: orderData.description, 
               quantity: orderData.quantity,       
-              unit_price: orderData.total_amount / orderData.quantity, // Or BASE_PRICE if more appropriate
+              unit_price: calculateUnitPrice(orderData.quantity),
               total_price: orderData.total_amount
             }
           ]
@@ -386,48 +432,52 @@ export default function QuoteBuilder() {
             />
           </motion.div>
 
-          <motion.div variants={itemVariants} className="relative">
-            <label htmlFor="quantity" className="block text-lg font-medium text-gray-700 mb-2">
-              Quantity
-            </label>
-            <input
-              type="number"
-              id="quantity"
-              name="quantity"
-              min="1"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              value={formData.quantity}
-              onChange={handleInputChange}
-              required
-            />
-            <AnimatePresence>
-              {formData.quantity >= 12 && (
-                <motion.p
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute -right-4 -top-4 bg-sage-500 text-white px-3 py-1 rounded-full text-sm transform rotate-12"
-                >
-                  {(calculateBulkDiscount(formData.quantity) * 100).toFixed(0)}% off!
-                </motion.p>
-              )}
-            </AnimatePresence>
-          </motion.div>
+        
+        <motion.div variants={itemVariants} className="relative">
+          <label htmlFor="quantity" className="block text-lg font-medium text-gray-700 mb-2">
+            Quantity
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            id="quantity"
+            name="quantity"
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
+            value={formData.quantity === 0 ? '' : formData.quantity}
+            onChange={handleInputChange}
+            required
+          />
+          <AnimatePresence>
+            {formData.quantity >= 12 && (
+              <motion.p
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute -right-4 -top-4 bg-sage-500 text-white px-3 py-1 rounded-full text-sm transform rotate-12"
+              >
+                {(calculateBulkDiscount(formData.quantity) * 100).toFixed(0)}% off!
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <label htmlFor="specialInstructions" className="block text-lg font-medium text-gray-700 mb-2">
-              Additional Special Instructions <span className="text-sm text-gray-500">(optional)</span>
-            </label>
-            <textarea
-              id="specialInstructions"
-              name="specialInstructions"
-              rows={3}
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              placeholder="Any allergies, dietary restrictions, or other special requests? Need specific packaging or delivery instructions?"
-              value={formData.specialInstructions}
-              onChange={handleInputChange}
-            />
-          </motion.div>
+        <motion.div variants={itemVariants}>
+          <label htmlFor="specialInstructions" className="block text-lg font-medium text-gray-700 mb-2">
+            Additional Special Instructions <span className="text-sm text-gray-500">(optional)</span>
+          </label>
+          <textarea
+            id="specialInstructions"
+            name="specialInstructions"
+            rows={3}
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
+            placeholder="Any allergies, dietary restrictions, or other special requests? Need specific packaging or delivery instructions?"
+            value={formData.specialInstructions}
+            onChange={handleInputChange}
+          />
+        </motion.div>
+
+
 
           <motion.div
             variants={itemVariants}
@@ -452,7 +502,7 @@ export default function QuoteBuilder() {
               </AnimatePresence>
             </div>
             <p className="text-sm text-gray-600 mt-2">
-              Base price: ${BASE_PRICE.toFixed(2)} per cookie
+              Base price: ${getBasePrice().toFixed(2)} per cookie
             </p>
           </motion.div>
 
