@@ -67,6 +67,7 @@ const DEFAULT_HTML_TEMPLATE = `
         <p><strong>Order Number:</strong> #{{ORDER_NUMBER}}</p>
         <p><strong>Order Date:</strong> {{order_date}}</p>
         <p><strong>Order Total:</strong> {{order_total}}</p>
+        <p><strong>Phone:</strong> {{customer_phone}}</p>
       </div>
       <h2 style="font-size: 20px; color: #5a3e36; margin-top: 30px;">Order Summary:</h2>
       {{order_items_table}}
@@ -203,6 +204,7 @@ serve(async (req: Request) => {
     htmlContent = htmlContent.replace(/{{order_date}}/g, formatDate(orderData.created_at));
     htmlContent = htmlContent.replace(/{{order_total}}/g, formatCurrency(orderData.total_amount));
     htmlContent = htmlContent.replace(/{{order_items_table}}/g, generateOrderItemsTable(orderData.items));
+    htmlContent = htmlContent.replace(/{{customer_phone}}/g, orderData.customer_phone || 'N/A');
 
     const senderEmail = DEFAULT_SENDER_EMAIL;
 

@@ -37,6 +37,7 @@ const DEFAULT_ADMIN_NEW_ORDER_HTML_TEMPLATE = `
         <li><strong>Order Number:</strong> {{ORDER_NUMBER}}</li>
         <li><strong>Customer Name:</strong> {{customer_name}}</li>
         <li><strong>Customer Email:</strong> {{customer_email}}</li>
+        <li><strong>Customer Phone:</strong> {{customer_phone}}</li>
         <li><strong>Order Date:</strong> {{order_date}}</li>
         <li><strong>Order Total:</strong> {{order_total}}</li>
         <li><strong>Delivery Option:</strong> {{delivery_option}}</li>
@@ -138,6 +139,7 @@ Deno.serve(async (req: Request) => {
       .replace(/{{ORDER_NUMBER}}/g, orderData.order_number) // Use the new order_number
       .replace(/{{customer_name}}/g, orderData.customer_name)
       .replace(/{{customer_email}}/g, orderData.customer_email)
+      .replace(/{{customer_phone}}/g, orderData.customer_phone || 'N/A')
       .replace(/{{order_date}}/g, orderDate)
       .replace(/{{order_total}}/g, orderTotal)
       .replace(/{{delivery_option}}/g, orderData.delivery_option || 'N/A')

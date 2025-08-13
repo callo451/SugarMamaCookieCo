@@ -14,6 +14,7 @@ interface OrderDetailsModalProps {
     status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
     customer_name: string;
     customer_email: string;
+    customer_phone?: string;
     quantity: number;
     description: string;
     category: string;
@@ -132,6 +133,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     if (editedOrder.customer_email !== order.customer_email) {
       updates.customer_email = editedOrder.customer_email;
     }
+    if (editedOrder.customer_phone !== order.customer_phone) {
+      updates.customer_phone = editedOrder.customer_phone || null;
+    }
     if (editedOrder.total_amount !== order.total_amount) {
       updates.total_amount = editedOrder.total_amount;
     }
@@ -221,6 +225,18 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   onChange={handleInputChange}
                   onBlur={handleBlur}
                   className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Customer Phone</h3>
+                <input
+                  type="tel"
+                  name="customer_phone"
+                  value={editedOrder.customer_phone || ''}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  className="mt-1 w-full text-sm text-gray-900 border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                  placeholder="e.g. 0400 000 000"
                 />
               </div>
               <div>

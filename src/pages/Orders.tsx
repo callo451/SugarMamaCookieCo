@@ -14,6 +14,7 @@ interface Order {
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   quantity: number;
   description: string;
   category: string;
@@ -249,7 +250,7 @@ export default function Orders() {
 
       // Apply filters if they exist
       if (searchQuery) {
-        query = query.or(`customer_email.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        query = query.or(`customer_email.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%,customer_phone.ilike.%${searchQuery}%`);
       }
       if (selectedStatus && selectedStatus.length > 0) {
         query = query.in('status', selectedStatus);
@@ -390,10 +391,12 @@ export default function Orders() {
       const orderDataPayload = {
         customer_email: selectedOrderForNotification.customer_email,
         customer_name: selectedOrderForNotification.customer_name || 'Valued Customer',
+        customer_phone: selectedOrderForNotification.customer_phone,
+        order_number: selectedOrderForNotification.display_order_id || selectedOrderForNotification.id.slice(0,8),
         order_id: selectedOrderForNotification.id, // This is the short ID from the Order interface
         order_date: selectedOrderForNotification.created_at,
         order_total: selectedOrderForNotification.total_amount,
-        order_items: currentOrderItems.map(item => ({
+        items: currentOrderItems.map(item => ({
           product_name: item.description, // Use description from OrderItem interface
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -433,6 +436,7 @@ export default function Orders() {
       'Order ID': string;
       'Date': string;
       'Email': string;
+      'Phone': string;
       'Status': string;
       'Total': string;
       'Items': string;
@@ -443,6 +447,7 @@ export default function Orders() {
       'Order ID': order.display_order_id || order.id,
       'Date': new Date(order.created_at).toLocaleDateString(),
       'Email': order.customer_email,
+      'Phone': order.customer_phone || '',
       'Status': order.status,
       'Total': order.total_amount.toFixed(2),
       'Items': order.description,
@@ -842,6 +847,9 @@ export default function Orders() {
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
                     <div className="text-sm text-gray-500">{order.customer_email}</div>
+                    {order.customer_phone && (
+                      <div className="text-xs text-gray-400">{order.customer_phone}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
@@ -911,7 +919,7 @@ export default function Orders() {
             </h3>
             <div className="mb-4">
               <p><strong>Order ID:</strong> {selectedOrderForNotification.id}</p>
-              <p><strong>Customer:</strong> {selectedOrderForNotification.customer_name} ({selectedOrderForNotification.customer_email})</p>
+              <p><strong>Customer:</strong> {selectedOrderForNotification.customer_name} ({selectedOrderForNotification.customer_email}{selectedOrderForNotification.customer_phone ? `, ${selectedOrderForNotification.customer_phone}` : ''})</p>
               <p><strong>Status:</strong> {selectedOrderForNotification.status}</p>
               <p>An email confirmation will be sent to {selectedOrderForNotification.customer_email}.</p>
             </div>

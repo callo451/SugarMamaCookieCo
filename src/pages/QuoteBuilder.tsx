@@ -14,6 +14,7 @@ interface QuoteFormData {
   specialInstructions: string;
   customerName: string;
   customerEmail: string;
+  customerPhone: string;
 }
 
 export default function QuoteBuilder() {
@@ -25,7 +26,8 @@ export default function QuoteBuilder() {
     specialFonts: '',
     specialInstructions: '',
     customerName: '',
-    customerEmail: ''
+    customerEmail: '',
+    customerPhone: ''
   });
   const [totalPrice, setTotalPrice] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -125,6 +127,7 @@ export default function QuoteBuilder() {
           status: 'pending',
           customer_name: formData.customerName,
           customer_email: formData.customerEmail,
+          customer_phone: formData.customerPhone,
           quantity: formData.quantity,
           description: formData.description,
           category: formData.category,
@@ -156,6 +159,7 @@ export default function QuoteBuilder() {
           order_number: orderData.display_order_id, // The new human-readable order number
           customer_name: orderData.customer_name, // From DB
           customer_email: orderData.customer_email, // From DB
+          customer_phone: orderData.customer_phone, // From DB
           created_at: orderData.created_at, // From DB
           total_amount: orderData.total_amount, // From DB
           delivery_option: "N/A - Quote Builder", // Placeholder
@@ -194,6 +198,7 @@ export default function QuoteBuilder() {
           order_number: orderData.display_order_id, // Human-readable QUXXX number
           customer_name: orderData.customer_name,
           customer_email: orderData.customer_email,
+          customer_phone: orderData.customer_phone,
           created_at: orderData.created_at,
           total_amount: orderData.total_amount,
           // delivery_option: orderData.delivery_option, // QuoteBuilder doesn't have this
@@ -318,6 +323,22 @@ export default function QuoteBuilder() {
               value={formData.customerEmail}
               onChange={handleInputChange}
               required
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <label htmlFor="customerPhone" className="block text-lg font-medium text-gray-700 mb-2">
+              Phone Number <span className="text-sm text-gray-500">(optional)</span>
+            </label>
+            <input
+              type="tel"
+              id="customerPhone"
+              name="customerPhone"
+              placeholder="e.g. 0400 123 456"
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
+              value={formData.customerPhone}
+              onChange={handleInputChange}
+              pattern="[0-9 +()-]{6,}"
             />
           </motion.div>
 

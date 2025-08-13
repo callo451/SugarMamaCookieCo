@@ -12,6 +12,7 @@ interface OrderModalProps {
 interface OrderFormData {
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   quantity: number;
   description: string;
   category: string;
@@ -24,6 +25,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
   const [formData, setFormData] = useState<OrderFormData>({
     customer_name: '',
     customer_email: '',
+    customer_phone: '',
     quantity: 1,
     description: '',
     category: '',
@@ -74,6 +76,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
         .insert([{
           customer_name: formData.customer_name,
           customer_email: formData.customer_email,
+          customer_phone: formData.customer_phone || null,
           status: 'pending',
           total_amount: totalPrice,
           quantity: formData.quantity,
@@ -111,6 +114,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
           order_number: orderData.display_order_id, // The new human-readable order number
           customer_name: orderData.customer_name, // From DB
           customer_email: orderData.customer_email, // From DB
+          customer_phone: orderData.customer_phone, // From DB
           created_at: orderData.created_at, // From DB
           total_amount: orderData.total_amount, // From DB
           delivery_option: "N/A - Order Modal", // Placeholder, OrderModal doesn't have this field directly
@@ -150,6 +154,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
           order_number: orderData.display_order_id, // Human-readable QUXXX number
           customer_name: orderData.customer_name,
           customer_email: orderData.customer_email,
+          customer_phone: orderData.customer_phone,
           created_at: orderData.created_at,
           total_amount: orderData.total_amount,
           // delivery_option: orderData.delivery_option, // OrderModal doesn't have this
@@ -240,6 +245,19 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
                   value={formData.customer_email}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Phone (optional)
+                </label>
+                <input
+                  type="tel"
+                  name="customer_phone"
+                  value={formData.customer_phone || ''}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500"
+                  placeholder="e.g. 0400 000 000"
                 />
               </div>
             </div>
