@@ -1,14 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { supabaseAdmin as supabase } from '../lib/supabase';
-import { Loader2, Search, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Search, Camera, ArrowRight, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface GalleryImage {
   name: string;
   url: string;
-  created_at: string;
-  metadata: {
-    category?: string;
-  };
+  category: string;
+}
+
+interface StorageFile {
+  name: string;
+  id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+const VALID_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+function isImageFile(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase();
+  return ext && VALID_EXTENSIONS.includes(ext);
+}
+
+function prettyName(filename: string) {
+  return filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+}
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function listStorageFiles(bucket: string, prefix = ''): Promise<StorageFile[]> {
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prefix, limit: 500, offset: 0, sortBy: { column: 'name', order: 'asc' } }),
+  });
+  if (!res.ok) throw new Error('Failed to list storage files');
+  return res.json();
+}
+
+function getPublicUrl(bucket: string, path: string): string {
+  const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+  return publicUrl;
 }
 
 export default function Gallery() {
@@ -16,8 +54,8 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchImages();
@@ -28,187 +66,331 @@ export default function Gallery() {
       setLoading(true);
       setError(null);
 
-      console.log('Attempting to fetch images from Supabase storage...');
-      
-      // First, let's check what buckets are available
-      const { data: buckets, error: bucketsError } = await supabase.storage
-        .listBuckets();
-      
-      console.log('Available buckets:', buckets);
-      if (bucketsError) {
-        console.error('Error fetching buckets:', bucketsError);
+      const allImages: GalleryImage[] = [];
+      const rootFiles = await listStorageFiles('Gallery');
+      const potentialFolders: string[] = [];
+
+      for (const entry of rootFiles) {
+        if (isImageFile(entry.name)) {
+          allImages.push({
+            name: entry.name,
+            url: getPublicUrl('Gallery', entry.name),
+            category: 'General',
+          });
+        } else if (!entry.name.includes('.')) {
+          potentialFolders.push(entry.name);
+        }
       }
 
-      const { data: imageList, error: storageError } = await supabase.storage
-        .from('Gallery')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'name', order: 'asc' }
-        });
-
-      console.log('Storage list response:', { imageList, storageError });
-
-      if (storageError) {
-        console.error('Storage error details:', storageError);
-        throw storageError;
+      for (const folder of potentialFolders) {
+        const folderFiles = await listStorageFiles('Gallery', folder);
+        for (const file of folderFiles) {
+          if (isImageFile(file.name)) {
+            allImages.push({
+              name: file.name,
+              url: getPublicUrl('Gallery', `${folder}/${file.name}`),
+              category: folder
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
+            });
+          }
+        }
       }
 
-      if (!imageList || imageList.length === 0) {
-        console.log('No images found in the Gallery bucket');
-        setError('No images found in the gallery');
-        return;
-      }
-
-      console.log('Found images:', imageList);
-
-      // Get public URLs for all images
-      const imagesWithUrls = await Promise.all(
-        imageList.map(async (file) => {
-          const { data: { publicUrl } } = supabase.storage
-            .from('Gallery')
-            .getPublicUrl(file.name);
-
-          return {
-            name: file.name,
-            url: publicUrl,
-            created_at: file.created_at,
-            metadata: file.metadata || {}
-          };
-        })
-      );
-
-      console.log('Images with URLs:', imagesWithUrls);
-
-      // Extract unique categories
-      const uniqueCategories = Array.from(
-        new Set(imagesWithUrls.map(img => img.metadata.category).filter(Boolean))
-      );
-      setCategories(['all', ...uniqueCategories]);
-
-      setImages(imagesWithUrls);
+      setImages(allImages);
     } catch (err) {
-      console.error('Detailed error:', err);
-      setError(err instanceof Error ? err.message : 'Error loading gallery images');
+      console.error('Gallery fetch error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load gallery');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredImages = images.filter(image => {
-    const matchesSearch = image.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || image.metadata.category === selectedCategory;
+  const categories = ['all', ...Array.from(new Set(images.map((img) => img.category)))];
+
+  const filteredImages = images.filter((image) => {
+    const matchesSearch =
+      !searchTerm || prettyName(image.name).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      selectedCategory === 'all' || image.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
+  const openLightbox = (index: number) => setLightboxIndex(index);
+  const closeLightbox = () => setLightboxIndex(null);
+
+  const navigateLightbox = (dir: -1 | 1) => {
+    if (lightboxIndex === null) return;
+    const next = lightboxIndex + dir;
+    if (next >= 0 && next < filteredImages.length) setLightboxIndex(next);
+  };
+
+  // Keyboard nav for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') navigateLightbox(-1);
+      if (e.key === 'ArrowRight') navigateLightbox(1);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxIndex, filteredImages.length]);
+
   return (
-    <div className="min-h-screen bg-white py-16 sm:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl">
+    <div className="min-h-screen bg-white">
+      {/* Hero banner */}
+      <section className="relative overflow-hidden bg-sage-50">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+        </div>
+        <div className="relative px-6 py-24 sm:px-10 md:px-16 lg:px-20 lg:py-32 text-center">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-xs font-medium uppercase tracking-[0.2em] text-sage-600"
+          >
+            Our Creations
+          </motion.p>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="mt-4 font-display text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl"
+          >
             Cookie Gallery
-          </h1>
-          <p className="mt-4 text-xl text-gray-600">
-            Explore our collection of custom-designed cookies
-          </p>
-        </div>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-4 text-lg text-gray-500 max-w-xl mx-auto"
+          >
+            Browse our collection of custom-designed cookies crafted for weddings, celebrations, and events
+          </motion.p>
 
-        {/* Filters */}
-        <div className="mt-12 flex flex-col sm:flex-row gap-4 items-center justify-between">
           {/* Search */}
-          <div className="relative flex-1 max-w-lg">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="mt-8 max-w-md mx-auto"
+          >
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search photos..."
+                className="w-full rounded-full border border-gray-200 bg-white pl-11 pr-4 py-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-sage-500 focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+              />
             </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search gallery..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-sage-500 focus:border-sage-500 sm:text-sm"
-            />
-          </div>
+          </motion.div>
 
-          {/* Category Filter */}
-          <div className="flex items-center space-x-2">
-            <Filter className="h-5 w-5 text-gray-400" />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-sage-500 focus:border-sage-500 sm:text-sm rounded-md"
+          {/* Category pills */}
+          {categories.length > 2 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-6 flex justify-center gap-2 flex-wrap"
             >
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </option>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                    selectedCategory === cat
+                      ? 'bg-sage-600 text-white shadow-sm'
+                      : 'bg-white text-gray-600 hover:bg-sage-50 hover:text-sage-700 border border-gray-200'
+                  }`}
+                >
+                  {cat === 'all' ? 'All' : cat}
+                </button>
               ))}
-            </select>
-          </div>
+            </motion.div>
+          )}
         </div>
+      </section>
 
-        {/* Gallery Grid */}
-        <div className="mt-12">
+      {/* Gallery grid */}
+      <section className="px-6 py-16 sm:px-10 md:px-16 lg:px-20 lg:py-24">
+        <div className="mx-auto max-w-7xl">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <Loader2 className="h-8 w-8 text-sage-500 animate-spin" />
-              <p className="text-sage-600">Loading gallery images...</p>
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-sage-200 border-t-sage-600" />
+              <p className="mt-4 text-sm text-gray-400">Loading gallery...</p>
             </div>
           ) : error ? (
-            <div className="text-center py-12 max-w-lg mx-auto">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-800 font-medium">Unable to load gallery images</p>
-                <p className="text-red-600 text-sm mt-1">{error}</p>
-                <button
-                  onClick={fetchImages}
-                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500"
-                >
-                  Try Again
-                </button>
-              </div>
+            <div className="text-center py-24">
+              <p className="text-sm text-red-500 mb-3">{error}</p>
+              <button
+                onClick={fetchImages}
+                className="text-sm font-medium text-sage-600 hover:text-sage-700"
+              >
+                Try again
+              </button>
             </div>
           ) : filteredImages.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No images found matching your search criteria</p>
-              {searchTerm || selectedCategory !== 'all' ? (
+            <div className="text-center py-24">
+              <Camera className="mx-auto h-14 w-14 text-gray-200 mb-4" />
+              <p className="font-display text-xl font-semibold text-gray-900">
+                {searchTerm || selectedCategory !== 'all' ? 'No matches found' : 'Gallery coming soon'}
+              </p>
+              <p className="mt-2 text-sm text-gray-500">
+                {searchTerm || selectedCategory !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : 'Check back soon for our latest creations.'}
+              </p>
+              {(searchTerm || selectedCategory !== 'all') && (
                 <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedCategory('all');
-                  }}
-                  className="mt-4 text-sage-600 hover:text-sage-700 text-sm font-medium"
+                  onClick={() => { setSearchTerm(''); setSelectedCategory('all'); }}
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-sage-600 hover:text-sage-700"
                 >
                   Clear filters
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
-              ) : null}
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {filteredImages.map((image, index) => (
-                <div
-                  key={image.name}
-                  className="group relative aspect-square overflow-hidden rounded-lg bg-gray-100 shadow-md hover:shadow-xl transition-all duration-300"
-                >
-                  <img
-                    src={image.url}
-                    alt={image.name}
-                    className="h-full w-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      {image.metadata.category && (
-                        <span className="inline-block px-2 py-0.5 text-xs font-medium bg-white/20 text-white rounded-full">
-                          {image.metadata.category}
+            <>
+              <p className="mb-8 text-sm text-gray-400">
+                {filteredImages.length} photo{filteredImages.length !== 1 ? 's' : ''}
+              </p>
+
+              {/* Masonry-style grid */}
+              <motion.div
+                className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  hidden: {},
+                  visible: { transition: { staggerChildren: 0.05 } },
+                }}
+              >
+                {filteredImages.map((image, index) => (
+                  <motion.div
+                    key={image.url}
+                    variants={{
+                      hidden: { opacity: 0, y: 24 },
+                      visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+                    }}
+                    className="group relative cursor-pointer overflow-hidden rounded-2xl break-inside-avoid"
+                    onClick={() => openLightbox(index)}
+                  >
+                    <img
+                      src={image.url}
+                      alt={prettyName(image.name)}
+                      loading="lazy"
+                      className="w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                      <p className="text-sm font-medium text-white truncate">
+                        {prettyName(image.name)}
+                      </p>
+                      {image.category !== 'General' && (
+                        <span className="mt-1 inline-block rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-0.5 text-xs font-medium text-white">
+                          {image.category}
                         </span>
                       )}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </>
           )}
         </div>
-      </div>
+      </section>
+
+      {/* CTA */}
+      {!loading && filteredImages.length > 0 && (
+        <section className="px-6 pb-24 sm:px-10 md:px-16 lg:px-20">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="mx-auto max-w-3xl rounded-3xl bg-sage-50 p-10 sm:p-14 text-center"
+          >
+            <h2 className="font-display text-2xl font-semibold text-gray-900 sm:text-3xl">
+              Love what you see?
+            </h2>
+            <p className="mt-3 text-gray-500">
+              Every cookie is custom-made to match your vision. Tell us about your event and we'll bring it to life.
+            </p>
+            <Link
+              to="/quote-builder"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-sage-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-sage-700"
+            >
+              Start Your Quote
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </motion.div>
+        </section>
+      )}
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxIndex !== null && filteredImages[lightboxIndex] && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+            onClick={closeLightbox}
+          >
+            {/* Close button */}
+            <button
+              onClick={closeLightbox}
+              className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white/70 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Prev button */}
+            {lightboxIndex > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); navigateLightbox(-1); }}
+                className="absolute left-4 z-10 rounded-full bg-white/10 p-2.5 text-white/70 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+
+            {/* Next button */}
+            {lightboxIndex < filteredImages.length - 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); navigateLightbox(1); }}
+                className="absolute right-4 z-10 rounded-full bg-white/10 p-2.5 text-white/70 backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-white"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+
+            {/* Image */}
+            <motion.img
+              key={filteredImages[lightboxIndex].url}
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={filteredImages[lightboxIndex].url}
+              alt={prettyName(filteredImages[lightboxIndex].name)}
+              className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* Counter */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white/60 backdrop-blur-sm">
+              {lightboxIndex + 1} / {filteredImages.length}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-} 
+}

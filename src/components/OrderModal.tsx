@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface OrderModalProps {
   isOpen: boolean;
@@ -71,7 +71,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
 
     try {
       // Create the order
-      const { data: orderData, error: orderError } = await supabaseAdmin
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{
           customer_name: formData.customer_name,
@@ -94,7 +94,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
       }
 
       // Create the order item
-      const { error: itemError } = await supabaseAdmin
+      const { error: itemError } = await supabase
         .from('order_items')
         .insert([{
           order_id: orderData.id,
@@ -132,7 +132,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
       // Send admin new order alert
       try {
         console.log('Attempting to send admin new order alert for order ID:', orderData.id);
-        const { data: alertData, error: alertError } = await supabaseAdmin.functions.invoke(
+        const { data: alertData, error: alertError } = await supabase.functions.invoke(
           'send-admin-new-order-alert',
           { body: adminAlertPayload }
         );
@@ -173,7 +173,7 @@ export default function OrderModal({ isOpen, onClose, onOrderCreated }: OrderMod
       // Send customer order confirmation email
       try {
         console.log('Attempting to send customer order confirmation for order ID:', orderData.id);
-        const { data: customerEmailData, error: customerEmailError } = await supabaseAdmin.functions.invoke(
+        const { data: customerEmailData, error: customerEmailError } = await supabase.functions.invoke(
           'send-order-notification',
           { body: customerNotificationPayload }
         );

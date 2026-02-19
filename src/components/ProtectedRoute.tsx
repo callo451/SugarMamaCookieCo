@@ -8,23 +8,27 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authState, setAuthState] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        setIsAuthenticated(!!user);
+        if (user && user.user_metadata?.is_admin === true) {
+          setAuthState('authorized');
+        } else {
+          setAuthState('unauthorized');
+        }
       } catch (error) {
         console.error('Error in checkAuth:', error);
-        setIsAuthenticated(false);
+        setAuthState('unauthorized');
       }
     };
 
     checkAuth();
   }, []);
 
-  if (isAuthenticated === null) {
+  if (authState === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-sage-50/50 to-white">
         <div className="text-center">
@@ -35,7 +39,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (authState === 'unauthorized') {
     return <Navigate to="/login" replace />;
   }
 

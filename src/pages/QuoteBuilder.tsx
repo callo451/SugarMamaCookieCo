@@ -1,10 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
-import { supabaseAdmin as supabase } from '../lib/supabase';
+import {
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Send,
+  PartyPopper,
+  Heart,
+  Baby,
+  Briefcase,
+  TreePine,
+  Sparkles,
+  Cake,
+  Circle,
+  Square,
+  Star,
+  Hexagon,
+  Paintbrush,
+  Minus,
+  Plus,
+  Loader2,
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 interface QuoteFormData {
   quantity: number;
   description: string;
@@ -17,9 +40,81 @@ interface QuoteFormData {
   customerPhone: string;
 }
 
+interface CategoryOption {
+  value: string;
+  label: string;
+  icon: React.ElementType;
+  colour: string;
+}
+
+interface ShapeOption {
+  value: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Static data                                                        */
+/* ------------------------------------------------------------------ */
+const CATEGORIES: CategoryOption[] = [
+  { value: 'wedding', label: 'Wedding', icon: Heart, colour: 'bg-rose-50 text-rose-600 border-rose-200 hover:border-rose-400' },
+  { value: 'birthday', label: 'Birthday', icon: Cake, colour: 'bg-amber-50 text-amber-600 border-amber-200 hover:border-amber-400' },
+  { value: 'bridal-shower', label: 'Bridal Shower', icon: PartyPopper, colour: 'bg-pink-50 text-pink-600 border-pink-200 hover:border-pink-400' },
+  { value: 'baby-shower', label: 'Baby Shower', icon: Baby, colour: 'bg-sky-50 text-sky-600 border-sky-200 hover:border-sky-400' },
+  { value: 'corporate', label: 'Corporate', icon: Briefcase, colour: 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400' },
+  { value: 'holiday', label: 'Holiday', icon: TreePine, colour: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:border-emerald-400' },
+  { value: 'other', label: 'Other', icon: Sparkles, colour: 'bg-violet-50 text-violet-600 border-violet-200 hover:border-violet-400' },
+];
+
+const SHAPES: ShapeOption[] = [
+  { value: 'circle', label: 'Circle', icon: Circle },
+  { value: 'square', label: 'Square', icon: Square },
+  { value: 'heart', label: 'Heart', icon: Heart },
+  { value: 'star', label: 'Star', icon: Star },
+  { value: 'hexagon', label: 'Hexagon', icon: Hexagon },
+  { value: 'custom', label: 'Custom', icon: Paintbrush },
+];
+
+const STEP_LABELS = ['Event', 'Design', 'Details', 'Contact'];
+
+const QUANTITY_PRESETS = [6, 12, 24, 50];
+
+/* ------------------------------------------------------------------ */
+/*  Animations                                                         */
+/* ------------------------------------------------------------------ */
+const pageVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 80 : -80,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -80 : 80,
+    opacity: 0,
+  }),
+};
+
+const pageTransition = {
+  type: 'tween' as const,
+  ease: [0.22, 1, 0.36, 1],
+  duration: 0.4,
+};
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 export default function QuoteBuilder() {
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState<QuoteFormData>({
-    quantity: 1,
+    quantity: 12,
     description: '',
     category: '',
     shape: '',
@@ -27,18 +122,13 @@ export default function QuoteBuilder() {
     specialInstructions: '',
     customerName: '',
     customerEmail: '',
-    customerPhone: ''
+    customerPhone: '',
   });
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-  const navigate = useNavigate();
 
-  // Pricing settings fetched from Supabase (fallback to defaults until loaded)
+  // Pricing
   const DEFAULT_SETTINGS = { base_price: 3.5, discount_12: 0.1, discount_24: 0.2, discount_50: 0.3 };
   const [pricingSettings, setPricingSettings] = useState<typeof DEFAULT_SETTINGS | null>(null);
 
-  // Fetch pricing settings once on mount
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
@@ -46,83 +136,97 @@ export default function QuoteBuilder() {
         .select('*')
         .limit(1)
         .single();
-      if (!error && data) {
-        setPricingSettings(data);
-      }
+      if (!error && data) setPricingSettings(data);
     })();
   }, []);
 
+  const getBasePrice = useCallback(
+    () => pricingSettings?.base_price ?? DEFAULT_SETTINGS.base_price,
+    [pricingSettings],
+  );
 
-  // Helper to access current base price
-  const getBasePrice = () => (pricingSettings?.base_price ?? DEFAULT_SETTINGS.base_price);
+  const calculateBulkDiscount = useCallback(
+    (qty: number): number => {
+      const s = pricingSettings ?? DEFAULT_SETTINGS;
+      if (qty >= 50) return s.discount_50;
+      if (qty >= 24) return s.discount_24;
+      if (qty >= 12) return s.discount_12;
+      return 0;
+    },
+    [pricingSettings],
+  );
 
-  const calculateBulkDiscount = (quantity: number): number => {
-    const settings = pricingSettings ?? DEFAULT_SETTINGS;
-    if (quantity >= 50) return settings.discount_50;
-    if (quantity >= 24) return settings.discount_24;
-    if (quantity >= 12) return settings.discount_12;
-    return 0;
-  };
+  const calculateUnitPrice = useCallback(
+    (qty: number) => Number((getBasePrice() * (1 - calculateBulkDiscount(qty))).toFixed(2)),
+    [getBasePrice, calculateBulkDiscount],
+  );
 
-  // Calculate the discounted price per cookie (rounded to 2dp)
-  const calculateUnitPrice = (quantity: number): number => {
-    const discount = calculateBulkDiscount(quantity);
-    const basePrice = getBasePrice();
-    return Number((basePrice * (1 - discount)).toFixed(2));
-  };
+  const calculatePrice = useCallback(
+    (qty: number) => Number((qty * calculateUnitPrice(qty)).toFixed(2)),
+    [calculateUnitPrice],
+  );
 
-  // Calculate total price based on quantity (rounded to 2dp). Uses the helper above.
-  const calculatePrice = (quantity: number): number => {
-    return Number((quantity * calculateUnitPrice(quantity)).toFixed(2));
-  };
+  const totalPrice = calculatePrice(formData.quantity);
+  const discount = calculateBulkDiscount(formData.quantity);
 
-  // Recalculate total whenever quantity changes with a short debounce for UX smoothness
-  useEffect(() => {
-    setIsCalculating(true);
-    const timer = setTimeout(() => {
-      setTotalPrice(calculatePrice(formData.quantity));
-      setIsCalculating(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [formData.quantity, pricingSettings]);
+  /* ---- Field helpers ---- */
+  const updateField = <K extends keyof QuoteFormData>(key: K, value: QuoteFormData[K]) =>
+    setFormData((prev) => ({ ...prev, [key]: value }));
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-
-    // For quantity, ignore non-numeric input to avoid NaN state
-    if (name === 'quantity') {
-      // Allow clearing the field
-      if (value === '') {
-        setFormData((prev) => ({ ...prev, quantity: 0 }));
-        return;
-      }
-      // Accept digits only
-      if (!/^\d+$/.test(value)) {
-        return; // ignore invalid character
-      }
-      setFormData((prev) => ({ ...prev, quantity: parseInt(value, 10) }));
-      return;
-    }
-
-    // Default handler for other fields
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    updateField(name as keyof QuoteFormData, value);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCalculating(true);
+  /* ---- Navigation ---- */
+  const canAdvance = (): boolean => {
+    switch (step) {
+      case 0:
+        return true; // category is optional
+      case 1:
+        return formData.quantity > 0 && formData.description.trim().length > 0;
+      case 2:
+        return true; // optional fields
+      case 3:
+        return (
+          formData.customerName.trim().length > 0 &&
+          formData.customerEmail.trim().length > 0 &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customerEmail)
+        );
+      default:
+        return false;
+    }
+  };
+
+  const goNext = () => {
+    if (!canAdvance()) return;
+    setDirection(1);
+    setStep((s) => Math.min(s + 1, 3));
+  };
+
+  const goBack = () => {
+    setDirection(-1);
+    setStep((s) => Math.max(s - 1, 0));
+  };
+
+  const goToStep = (target: number) => {
+    if (target > step && !canAdvance()) return;
+    setDirection(target > step ? 1 : -1);
+    setStep(target);
+  };
+
+  /* ---- Submit ---- */
+  const handleSubmit = async () => {
+    if (!canAdvance()) return;
+    setIsSubmitting(true);
 
     try {
-      // Ensure we have the latest price at the moment of submission (avoids stale state)
       const latestTotalPrice = calculatePrice(formData.quantity);
-      setTotalPrice(latestTotalPrice);
 
-      // Create the order
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
+      const { error: orderError } = await supabase.from('orders').insert([
+        {
           total_amount: latestTotalPrice,
           status: 'pending',
           customer_name: formData.customerName,
@@ -133,414 +237,489 @@ export default function QuoteBuilder() {
           category: formData.category,
           shape: formData.shape,
           special_fonts: formData.specialFonts,
-          special_instructions: formData.specialInstructions
-        }])
-        .select('*, display_order_id')
-        .single();
+          special_instructions: formData.specialInstructions,
+        },
+      ]);
 
       if (orderError) throw orderError;
 
-      // Create the order item
-      const { error: itemError } = await supabase
-        .from('order_items')
-        .insert([{
-          order_id: orderData.id,
-          quantity: formData.quantity,
-          unit_price: calculateUnitPrice(formData.quantity),
-          description: formData.description
-        }]);
+      const now = new Date().toISOString();
+      const unitPrice = calculateUnitPrice(formData.quantity);
 
-      if (itemError) throw itemError;
+      // Admin alert (non-blocking)
+      supabase.functions
+        .invoke('send-admin-new-order-alert', {
+          body: {
+            orderData: {
+              order_number: 'Pending',
+              customer_name: formData.customerName,
+              customer_email: formData.customerEmail,
+              customer_phone: formData.customerPhone,
+              created_at: now,
+              total_amount: latestTotalPrice,
+              delivery_option: 'N/A - Quote Builder',
+              notes: formData.specialInstructions || 'No special instructions provided.',
+              items: [{ product_name: formData.description, quantity: formData.quantity, unit_price: unitPrice }],
+            },
+          },
+        })
+        .catch((e) => console.error('Admin alert error:', e));
 
-      // Prepare payload for admin new order alert
-      const adminAlertPayload = {
-        orderData: {
-          order_id: orderData.id, // The UUID for internal reference
-          order_number: orderData.display_order_id, // The new human-readable order number
-          customer_name: orderData.customer_name, // From DB
-          customer_email: orderData.customer_email, // From DB
-          customer_phone: orderData.customer_phone, // From DB
-          created_at: orderData.created_at, // From DB
-          total_amount: orderData.total_amount, // From DB
-          delivery_option: "N/A - Quote Builder", // Placeholder
-          notes: orderData.special_instructions || "No special instructions provided.", // From DB
-          items: [
-            {
-              product_name: orderData.description, // Main description from the order
-              quantity: orderData.quantity,       // Main quantity from the order
-              unit_price: calculateUnitPrice(orderData.quantity)
-            }
-          ]
-        }
-      };
+      // Customer confirmation (non-blocking)
+      supabase.functions
+        .invoke('send-order-notification', {
+          body: {
+            orderData: {
+              order_number: 'Pending',
+              customer_name: formData.customerName,
+              customer_email: formData.customerEmail,
+              customer_phone: formData.customerPhone,
+              created_at: now,
+              total_amount: latestTotalPrice,
+              items: [
+                {
+                  product_name: formData.description,
+                  quantity: formData.quantity,
+                  unit_price: unitPrice,
+                  total_price: latestTotalPrice,
+                },
+              ],
+            },
+          },
+        })
+        .catch((e) => console.error('Customer email error:', e));
 
-      // Send admin new order alert
-      try {
-        console.log('Attempting to send admin new order alert for quote/order ID:', orderData.id);
-        const { data: alertData, error: alertError } = await supabase.functions.invoke(
-          'send-admin-new-order-alert',
-          { body: adminAlertPayload }
-        );
-
-        if (alertError) {
-          console.error('Error sending admin new order alert from QuoteBuilder:', alertError);
-        } else {
-          console.log('Admin new order alert from QuoteBuilder sent successfully:', alertData);
-        }
-      } catch (e) {
-        console.error('Exception when trying to send admin new order alert from QuoteBuilder:', e);
-      }
-
-      // Prepare payload for customer order confirmation email
-      const customerNotificationPayload = {
-        orderData: {
-          order_id: orderData.id, // UUID
-          order_number: orderData.display_order_id, // Human-readable QUXXX number
-          customer_name: orderData.customer_name,
-          customer_email: orderData.customer_email,
-          customer_phone: orderData.customer_phone,
-          created_at: orderData.created_at,
-          total_amount: orderData.total_amount,
-          // delivery_option: orderData.delivery_option, // QuoteBuilder doesn't have this
-          // notes: orderData.special_instructions, 
-          items: [
-            {
-              product_name: orderData.description, 
-              quantity: orderData.quantity,       
-              unit_price: calculateUnitPrice(orderData.quantity),
-              total_price: orderData.total_amount
-            }
-          ]
-        }
-      };
-
-      // Send customer order confirmation email
-      try {
-        console.log('Attempting to send customer order confirmation from QuoteBuilder for order ID:', orderData.id);
-        const { data: customerEmailData, error: customerEmailError } = await supabase.functions.invoke(
-          'send-order-notification',
-          { body: customerNotificationPayload }
-        );
-
-        if (customerEmailError) {
-          console.error('Error sending customer order confirmation email from QuoteBuilder:', customerEmailError);
-        } else {
-          console.log('Customer order confirmation email from QuoteBuilder sent successfully:', customerEmailData);
-        }
-      } catch (e) {
-        console.error('Exception when trying to send customer order confirmation email from QuoteBuilder:', e);
-      }
-
-      toast.success('Quote submitted successfully! We will contact you soon.');
+      toast.success('Quote submitted successfully! We\'ll be in touch soon.');
       navigate('/');
     } catch (error) {
       console.error('Error submitting quote:', error);
-      toast.error('Error submitting quote. Please try again.');
+      toast.error('Something went wrong. Please try again.');
     } finally {
-      setIsCalculating(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleFocus = (fieldName: string) => {
-    setFocusedField(fieldName);
-  };
+  /* ---------------------------------------------------------------- */
+  /*  Step content                                                     */
+  /* ---------------------------------------------------------------- */
 
-  const handleBlur = () => {
-    setFocusedField(null);
-  };
+  const stepContent = [
+    /* ---- Step 0: Event ---- */
+    <div key="event" className="space-y-8">
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-gray-900 sm:text-3xl">
+          What's the occasion?
+        </h2>
+        <p className="mt-2 text-gray-500">
+          Select a category so we can tailor your cookies — or skip ahead.
+        </p>
+      </div>
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        staggerChildren: 0.2,
-      },
-    },
-  };
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        {CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          const selected = formData.category === cat.value;
+          return (
+            <button
+              key={cat.value}
+              type="button"
+              onClick={() => updateField('category', selected ? '' : cat.value)}
+              className={`relative flex flex-col items-center gap-1.5 sm:gap-2 rounded-xl border-2 px-2 py-3 sm:px-4 sm:py-5 transition-all duration-200 ${
+                selected
+                  ? 'border-sage-500 bg-sage-50 ring-2 ring-sage-500/20'
+                  : `${cat.colour} border`
+              }`}
+            >
+              {selected && (
+                <motion.div
+                  layoutId="category-check"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-sage-500"
+                >
+                  <Check className="h-3 w-3 text-white" />
+                </motion.div>
+              )}
+              <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-xs sm:text-sm font-medium">{cat.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>,
 
-  const itemVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: {
-      opacity: 1,
-      x: 0,
-      transition: { duration: 0.5 },
-    },
-  };
+    /* ---- Step 1: Design ---- */
+    <div key="design" className="space-y-8">
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-gray-900 sm:text-3xl">
+          Design your cookies
+        </h2>
+        <p className="mt-2 text-gray-500">
+          Tell us what you're dreaming of and how many you need.
+        </p>
+      </div>
 
-  return (
-    <div className="min-h-screen pt-20 pb-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-sage-50">
-      <motion.div
-        className="max-w-3xl mx-auto"
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-      >
-        <motion.h1
-          className="text-4xl font-bold text-gray-900 mb-2 text-center"
-          variants={itemVariants}
-        >
-          Cookie Quote Builder
-        </motion.h1>
-        <motion.p
-          className="text-center text-gray-600 mb-8"
-          variants={itemVariants}
-        >
-          Design your perfect cookie order
-        </motion.p>
+      {/* Description */}
+      <div>
+        <label htmlFor="description" className="mb-2 block text-sm font-medium text-gray-700">
+          Describe your dream cookies <span className="text-red-400">*</span>
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          rows={3}
+          placeholder="e.g. Pastel pink and gold wedding cookies with floral details…"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.description}
+          onChange={handleInputChange}
+        />
+      </div>
 
-        <motion.form
-          onSubmit={handleSubmit}
-          className="space-y-6 bg-white p-8 rounded-xl shadow-lg border border-sage-100"
-          variants={containerVariants}
-        >
-          <motion.div variants={itemVariants}>
-            <label htmlFor="customerName" className="block text-lg font-medium text-gray-700 mb-2">
-              Your Name
-            </label>
-            <input
-              type="text"
-              id="customerName"
-              name="customerName"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              value={formData.customerName}
-              onChange={handleInputChange}
-              required
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <label htmlFor="customerEmail" className="block text-lg font-medium text-gray-700 mb-2">
-              Your Email
-            </label>
-            <input
-              type="email"
-              id="customerEmail"
-              name="customerEmail"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              value={formData.customerEmail}
-              onChange={handleInputChange}
-              required
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <label htmlFor="customerPhone" className="block text-lg font-medium text-gray-700 mb-2">
-              Phone Number <span className="text-sm text-gray-500">(optional)</span>
-            </label>
-            <input
-              type="tel"
-              id="customerPhone"
-              name="customerPhone"
-              placeholder="e.g. 0400 123 456"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              value={formData.customerPhone}
-              onChange={handleInputChange}
-              pattern="[0-9 +()-]{6,}"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <label htmlFor="category" className="block text-lg font-medium text-gray-700 mb-2">
-              Event Category <span className="text-sm text-gray-500">(optional)</span>
-            </label>
-            <div className="relative">
-              <select
-                id="category"
-                name="category"
-                className="appearance-none w-full rounded-lg border-2 border-gray-300 shadow-sm 
-                         focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 
-                         hover:border-sage-400 py-3 px-4 pr-10 bg-white
-                         cursor-pointer"
-                value={formData.category}
-                onChange={handleInputChange}
-                onFocus={() => handleFocus('category')}
-                onBlur={handleBlur}
+      {/* Shape */}
+      <div>
+        <p className="mb-3 text-sm font-medium text-gray-700">Cookie shape</p>
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+          {SHAPES.map((s) => {
+            const Icon = s.icon;
+            const selected = formData.shape === s.value;
+            return (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => updateField('shape', selected ? '' : s.value)}
+                className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-full border px-3 py-2 sm:px-4 text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  selected
+                    ? 'border-sage-500 bg-sage-500 text-white'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-sage-300 hover:bg-sage-50 active:bg-sage-50'
+                }`}
               >
-                <option value="" disabled>
-                  Select a category...
-                </option>
-                <option value="wedding">💒 Wedding</option>
-                <option value="birthday">🎂 Birthday</option>
-                <option value="bridal-shower">👰 Bridal Shower</option>
-                <option value="baby-shower">👶 Baby Shower</option>
-                <option value="corporate">💼 Corporate Event</option>
-                <option value="holiday">🎄 Holiday</option>
-                <option value="other">✨ Other</option>
-              </select>
-              <div
-                className={`absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none
-                            transition-transform duration-200 ${focusedField === 'category' ? 'transform rotate-180' : ''}`}
-              >
-                <ChevronDown className="h-5 w-5 text-gray-400" />
-              </div>
-              <div
-                className={`absolute inset-0 rounded-lg pointer-events-none
-                            transition-opacity duration-200 ${focusedField === 'category' ? 'ring-2 ring-sage-500 ring-opacity-50' : 'ring-0'}`}
-              />
-            </div>
-          </motion.div>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-          <motion.div variants={itemVariants}>
-            <label htmlFor="description" className="block text-lg font-medium text-gray-700 mb-2">
-              Cookie Description
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={3}
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              placeholder="Describe your dream cookies... (e.g., flavor, color scheme, theme)"
-              value={formData.description}
-              onChange={handleInputChange}
-              required
-            />
-          </motion.div>
+      {/* Quantity */}
+      <div>
+        <p className="mb-3 text-sm font-medium text-gray-700">
+          How many cookies? <span className="text-red-400">*</span>
+        </p>
 
-          <motion.div variants={itemVariants}>
-            <label htmlFor="shape" className="block text-lg font-medium text-gray-700 mb-2">
-              Cookie Shape <span className="text-sm text-gray-500">(optional)</span>
-            </label>
-            <div className="relative">
-              <select
-                id="shape"
-                name="shape"
-                className="appearance-none w-full rounded-lg border-2 border-gray-300 shadow-sm 
-                         focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 
-                         hover:border-sage-400 py-3 px-4 pr-10 bg-white
-                         cursor-pointer"
-                value={formData.shape}
-                onChange={handleInputChange}
-                onFocus={() => handleFocus('shape')}
-                onBlur={handleBlur}
-              >
-                <option value="" disabled>
-                  Select a shape...
-                </option>
-                <option value="circle">⭕ Circle</option>
-                <option value="square">⬛ Square</option>
-                <option value="heart">❤️ Heart</option>
-                <option value="star">⭐ Star</option>
-                <option value="custom">🎨 Custom Shape</option>
-              </select>
-              <div
-                className={`absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none
-                            transition-transform duration-200 ${focusedField === 'shape' ? 'transform rotate-180' : ''}`}
-              >
-                <ChevronDown className="h-5 w-5 text-gray-400" />
-              </div>
-              <div
-                className={`absolute inset-0 rounded-lg pointer-events-none
-                            transition-opacity duration-200 ${focusedField === 'shape' ? 'ring-2 ring-sage-500 ring-opacity-50' : 'ring-0'}`}
-              />
-            </div>
-          </motion.div>
+        {/* Preset chips */}
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          {QUANTITY_PRESETS.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => updateField('quantity', q)}
+              className={`rounded-full border px-2 py-2 text-xs sm:text-sm font-medium transition-all duration-200 ${
+                formData.quantity === q
+                  ? 'border-sage-500 bg-sage-500 text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-sage-300'
+              }`}
+            >
+              {q} cookies
+            </button>
+          ))}
+        </div>
 
-          <motion.div variants={itemVariants}>
-            <label htmlFor="specialFonts" className="block text-lg font-medium text-gray-700 mb-2">
-              Special Fonts or Text <span className="text-sm text-gray-500">(optional)</span>
-            </label>
-            <textarea
-              id="specialFonts"
-              name="specialFonts"
-              rows={2}
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-              placeholder="Any specific fonts or text you'd like on the cookies? (e.g., names, dates, messages)"
-              value={formData.specialFonts}
-              onChange={handleInputChange}
-            />
-          </motion.div>
-
-        
-        <motion.div variants={itemVariants} className="relative">
-          <label htmlFor="quantity" className="block text-lg font-medium text-gray-700 mb-2">
-            Quantity
-          </label>
+        {/* Stepper */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => updateField('quantity', Math.max(1, formData.quantity - 1))}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-sage-400 hover:text-sage-600 active:bg-sage-50"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
           <input
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            id="quantity"
-            name="quantity"
-            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
             value={formData.quantity === 0 ? '' : formData.quantity}
-            onChange={handleInputChange}
-            required
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '') { updateField('quantity', 0); return; }
+              if (/^\d+$/.test(v)) updateField('quantity', parseInt(v, 10));
+            }}
+            className="w-16 sm:w-20 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center text-lg font-semibold text-gray-900 focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
           />
+          <button
+            type="button"
+            onClick={() => updateField('quantity', formData.quantity + 1)}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-sage-400 hover:text-sage-600 active:bg-sage-50"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+
           <AnimatePresence>
-            {formData.quantity >= 12 && (
-              <motion.p
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute -right-4 -top-4 bg-sage-500 text-white px-3 py-1 rounded-full text-sm transform rotate-12"
+            {discount > 0 && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="rounded-full bg-sage-100 px-2.5 py-1 text-xs sm:text-sm font-semibold text-sage-700 whitespace-nowrap"
               >
-                {(calculateBulkDiscount(formData.quantity) * 100).toFixed(0)}% off!
-              </motion.p>
+                {(discount * 100).toFixed(0)}% off!
+              </motion.span>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
+      </div>
+    </div>,
 
-        <motion.div variants={itemVariants}>
-          <label htmlFor="specialInstructions" className="block text-lg font-medium text-gray-700 mb-2">
-            Additional Special Instructions <span className="text-sm text-gray-500">(optional)</span>
-          </label>
-          <textarea
-            id="specialInstructions"
-            name="specialInstructions"
-            rows={3}
-            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sage-500 focus:ring-sage-500 transition-all duration-200 hover:border-sage-400"
-            placeholder="Any allergies, dietary restrictions, or other special requests? Need specific packaging or delivery instructions?"
-            value={formData.specialInstructions}
-            onChange={handleInputChange}
-          />
-        </motion.div>
+    /* ---- Step 2: Details ---- */
+    <div key="details" className="space-y-8">
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-gray-900 sm:text-3xl">
+          The finer details
+        </h2>
+        <p className="mt-2 text-gray-500">
+          Add any text, fonts, or special requirements — all optional.
+        </p>
+      </div>
 
+      <div>
+        <label htmlFor="specialFonts" className="mb-2 block text-sm font-medium text-gray-700">
+          Text on the cookies
+        </label>
+        <textarea
+          id="specialFonts"
+          name="specialFonts"
+          rows={2}
+          placeholder="Names, dates, messages, preferred fonts…"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.specialFonts}
+          onChange={handleInputChange}
+        />
+      </div>
 
+      <div>
+        <label htmlFor="specialInstructions" className="mb-2 block text-sm font-medium text-gray-700">
+          Special instructions
+        </label>
+        <textarea
+          id="specialInstructions"
+          name="specialInstructions"
+          rows={3}
+          placeholder="Allergies, dietary needs, packaging, delivery preferences…"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.specialInstructions}
+          onChange={handleInputChange}
+        />
+      </div>
+    </div>,
 
-          <motion.div
-            variants={itemVariants}
-            className="bg-gradient-to-r from-sage-50 to-sage-100 p-6 rounded-xl shadow-inner"
-          >
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium text-gray-900">Total Price:</span>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={totalPrice}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="text-3xl font-bold text-sage-700"
+    /* ---- Step 3: Contact ---- */
+    <div key="contact" className="space-y-8">
+      <div>
+        <h2 className="font-display text-2xl font-semibold text-gray-900 sm:text-3xl">
+          Almost there!
+        </h2>
+        <p className="mt-2 text-gray-500">
+          Tell us who you are and we'll send your quote.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="customerName" className="mb-2 block text-sm font-medium text-gray-700">
+          Your name <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="text"
+          id="customerName"
+          name="customerName"
+          placeholder="Jane Smith"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.customerName}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="customerEmail" className="mb-2 block text-sm font-medium text-gray-700">
+          Email address <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="email"
+          id="customerEmail"
+          name="customerEmail"
+          placeholder="jane@example.com"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.customerEmail}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="customerPhone" className="mb-2 block text-sm font-medium text-gray-700">
+          Phone number <span className="text-gray-400">(optional)</span>
+        </label>
+        <input
+          type="tel"
+          id="customerPhone"
+          name="customerPhone"
+          placeholder="0400 123 456"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder:text-gray-400 transition-colors focus:border-sage-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20"
+          value={formData.customerPhone}
+          onChange={handleInputChange}
+        />
+      </div>
+    </div>,
+  ];
+
+  /* ---------------------------------------------------------------- */
+  /*  Render                                                           */
+  /* ---------------------------------------------------------------- */
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-sage-50 pt-20 pb-12 sm:pt-24 sm:pb-16">
+      <div className="mx-auto max-w-2xl px-4 sm:px-6">
+        {/* ---- Progress bar ---- */}
+        <div className="mb-8 sm:mb-12">
+          <div className="flex items-center justify-between">
+            {STEP_LABELS.map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => goToStep(i)}
+                className="flex flex-col items-center gap-1.5 sm:gap-2"
+              >
+                <div
+                  className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 ${
+                    i < step
+                      ? 'bg-sage-500 text-white'
+                      : i === step
+                        ? 'bg-sage-500 text-white ring-4 ring-sage-500/20'
+                        : 'bg-gray-100 text-gray-400'
+                  }`}
                 >
-                  {isCalculating ? (
-                    <span className="animate-pulse">...</span>
-                  ) : (
-                    `$${totalPrice.toFixed(2)}`
-                  )}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              Base price: ${getBasePrice().toFixed(2)} per cookie
-            </p>
-          </motion.div>
+                  {i < step ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : i + 1}
+                </div>
+                <span
+                  className={`text-[10px] sm:text-xs font-medium ${
+                    i <= step ? 'text-sage-700' : 'text-gray-400'
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            ))}
+          </div>
 
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <button
-              type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-lg font-medium text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-all duration-200"
+          {/* Track */}
+          <div className="mt-3 sm:mt-4 h-1 rounded-full bg-gray-100">
+            <motion.div
+              className="h-full rounded-full bg-sage-500"
+              initial={false}
+              animate={{ width: `${(step / (STEP_LABELS.length - 1)) * 100}%` }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
+        </div>
+
+        {/* ---- Step content ---- */}
+        <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={step}
+              custom={direction}
+              variants={pageVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={pageTransition}
             >
-              Get Quote
+              {stepContent[step]}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* ---- Price summary (visible from step 1 onwards) ---- */}
+        <AnimatePresence>
+          {step >= 1 && formData.quantity > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mt-4 flex flex-col gap-1 rounded-2xl border border-sage-100 bg-sage-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4"
+            >
+              <p className="text-xs sm:text-sm text-gray-500">
+                {formData.quantity} cookies &times; ${calculateUnitPrice(formData.quantity).toFixed(2)} each
+                {discount > 0 && (
+                  <span className="ml-1.5 sm:ml-2 text-sage-600 font-medium">({(discount * 100).toFixed(0)}% off)</span>
+                )}
+              </p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={totalPrice}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="text-xl sm:text-2xl font-bold text-sage-700"
+                >
+                  ${totalPrice.toFixed(2)}
+                </motion.p>
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ---- Navigation buttons ---- */}
+        <div className="mt-5 sm:mt-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={goBack}
+            disabled={step === 0}
+            className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full px-4 py-2.5 sm:px-5 sm:py-3 text-sm font-medium transition-all duration-200 ${
+              step === 0
+                ? 'cursor-not-allowed text-gray-300'
+                : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+            }`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+
+          {step < 3 ? (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canAdvance()}
+              className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold transition-all duration-200 ${
+                canAdvance()
+                  ? 'bg-sage-500 text-white hover:bg-sage-600 active:bg-sage-700'
+                  : 'cursor-not-allowed bg-gray-200 text-gray-400'
+              }`}
+            >
+              Continue
+              <ArrowRight className="h-4 w-4" />
             </button>
-          </motion.div>
-        </motion.form>
-      </motion.div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canAdvance() || isSubmitting}
+              className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold transition-all duration-200 ${
+                canAdvance() && !isSubmitting
+                  ? 'bg-sage-500 text-white hover:bg-sage-600 active:bg-sage-700'
+                  : 'cursor-not-allowed bg-gray-200 text-gray-400'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                <>
+                  Submit Quote
+                  <Send className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

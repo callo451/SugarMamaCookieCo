@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Package, UserCircle, ShoppingBag, Users as UsersIcon, Search, Shield, Edit2, Trash2, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users as UsersIcon, Search, Shield, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface User {
@@ -14,12 +13,9 @@ interface User {
 }
 
 export default function Users() {
-  const location = useLocation();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAdminModal, setShowAdminModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -84,53 +80,11 @@ export default function Users() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Admin Navigation */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Admin Portal</h2>
-        </div>
-        
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <Link
-              to="/admin"
-              className={`${
-                location.pathname === '/admin'
-                  ? 'border-sage-500 text-sage-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-            >
-              <Package className="h-5 w-5 inline-block mr-2" />
-              Products
-            </Link>
-            <Link
-              to="/admin/orders"
-              className={`${
-                location.pathname === '/admin/orders'
-                  ? 'border-sage-500 text-sage-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-            >
-              <ShoppingBag className="h-5 w-5 inline-block mr-2" />
-              Orders
-            </Link>
-            <Link
-              to="/admin/users"
-              className={`${
-                location.pathname === '/admin/users'
-                  ? 'border-sage-500 text-sage-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-            >
-              <UsersIcon className="h-5 w-5 inline-block mr-2" />
-              Users
-            </Link>
-          </nav>
-        </div>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
       </div>
 
-      {/* Users Table */}
       <div className="bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row gap-4">

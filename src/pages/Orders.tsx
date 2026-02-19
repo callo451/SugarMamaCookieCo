@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react'; // Removed React as it's implicitly available
-import { useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Download, Filter, Search, ArrowUpDown, BarChart, DollarSign, Plus, Trash2, LogOut, Mail, Edit3, Clock } from 'lucide-react'; // Added Edit3 icon
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ShoppingBag, Download, Filter, Search, ArrowUpDown, BarChart, DollarSign, Plus, Trash2, Mail, Clock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import OrderModal from '../components/OrderModal';
-import OrderDetailsModal from '../components/OrderDetailsModal';
-import PricingSettingsModal from '../components/PricingSettingsModal';
 
 interface Order {
   id: string;
@@ -46,7 +44,6 @@ interface Analytics {
 }
 
 export default function Orders() {
-  const location = useLocation();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,184 +63,20 @@ export default function Orders() {
     pendingOrders: 0 // Initialize pendingOrders
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<Order | null>(null);
-
-  // State for Email Template Customization
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [activeTemplateTab, setActiveTemplateTab] = useState<'orderConfirmation' | 'adminReminder'>('orderConfirmation');
-  const [orderConfirmationTemplateHtml, setOrderConfirmationTemplateHtml] = useState('');
-  const [adminReminderTemplateHtml, setAdminReminderTemplateHtml] = useState('');
-  const [templateLoading, setTemplateLoading] = useState(false);
-  const [templateSaving, setTemplateSaving] = useState(false);
   const [sendingNotification, setSendingNotification] = useState(false);
-  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
-  // Default order confirmation template with placeholders
-  const DEFAULT_ORDER_CONFIRMATION_TEMPLATE = `
-<html>
-  <head>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
-      .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
-      h1 { color: #5a3e36; font-size: 24px; margin-top: 0; }
-      p { line-height: 1.6; margin-bottom: 15px; }
-      .order-details { margin-top: 20px; margin-bottom: 20px; }
-      .order-details strong { display: inline-block; width: 120px; }
-      .footer { margin-top: 30px; text-align: center; font-size: 0.9em; color: #777; }
-      .items-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-      .items-table th, .items-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-      .items-table th { background-color: #f8f8f8; }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Thank you for your order, {{customer_name}}!</h1>
-      <p>We're excited to prepare your delicious treats. Your order has been confirmed.</p>
-      <div class="order-details">
-        <p><strong>Order ID:</strong> #{{order_id}}</p>
-        <p><strong>Order Date:</strong> {{order_date}}</p>
-        <p><strong>Order Total:</strong> {{order_total}}</p>
-      </div>
-      <h2 style="font-size: 20px; color: #5a3e36; margin-top: 30px;">Order Summary:</h2>
-      {{order_items_table}} 
-      <p>We'll notify you again once your order is out for delivery or ready for pickup.</p>
-      <div class="footer">
-        <p>Thanks for choosing Sugar Mama Cookie Co!</p>
-        <p>Sugar Mama Cookie Co | Melbourne, Australia</p>
-      </div>
-    </div>
-  </body>
-</html>
-  `.trim();
-
-  const DEFAULT_ADMIN_REMINDER_TEMPLATE = `
-<html>
-  <head><title>Order Reminder</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-      h1 { color: #d9534f; }
-      p { margin-bottom: 10px; }
-      .items-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-      .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      .items-table th { background-color: #f2f2f2; }
-    </style>
-  </head>
-  <body>
-    <h1>Admin Reminder: Unacknowledged Order</h1>
-    <p>The following order requires attention as it has not been acknowledged or processed in a timely manner:</p>
-    <p><strong>Order ID:</strong> #{{order_id}}</p>
-    <p><strong>Customer:</strong> {{customer_name}} ({{customer_email}})</p>
-    <p><strong>Order Date:</strong> {{order_date}}</p>
-    <p><strong>Order Total:</strong> {{order_total}}</p>
-    <h2 style="font-size: 1.2em; margin-top: 20px;">Order Items:</h2>
-    {{order_items_table}}
-    <p style="margin-top: 20px;">Please review this order in the admin panel and update its status accordingly.</p>
-  </body>
-</html>
-  `.trim();
-
-  const loadEmailTemplate = async (templateName: 'orderConfirmation' | 'adminReminder') => {
-    console.log(`Loading ${templateName} template from Supabase...`);
-    setTemplateLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('email_templates')
-        .select('html_content')
-        .eq('name', templateName)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116: 'Searched item was not found'
-        console.error('Error loading email template:', error);
-        if (templateName === 'orderConfirmation') {
-          setOrderConfirmationTemplateHtml(DEFAULT_ORDER_CONFIRMATION_TEMPLATE);
-        } else {
-          setAdminReminderTemplateHtml(DEFAULT_ADMIN_REMINDER_TEMPLATE);
-        }
-        alert(`Error loading template: ${error.message}`);
-      } else if (data && data.html_content) {
-        if (templateName === 'orderConfirmation') {
-          setOrderConfirmationTemplateHtml(data.html_content);
-        } else {
-          setAdminReminderTemplateHtml(data.html_content);
-        }
-        console.log(`${templateName} template loaded from Supabase.`);
-      } else {
-        // No template found in DB, use default
-        console.log(`No '${templateName}' template found in DB, using default.`);
-        if (templateName === 'orderConfirmation') {
-          setOrderConfirmationTemplateHtml(DEFAULT_ORDER_CONFIRMATION_TEMPLATE);
-        } else {
-          setAdminReminderTemplateHtml(DEFAULT_ADMIN_REMINDER_TEMPLATE);
-        }
-      }
-    } catch (err) {
-      console.error('Unexpected error loading email template:', err);
-      if (templateName === 'orderConfirmation') {
-        setOrderConfirmationTemplateHtml(DEFAULT_ORDER_CONFIRMATION_TEMPLATE);
-      } else {
-        setAdminReminderTemplateHtml(DEFAULT_ADMIN_REMINDER_TEMPLATE);
-      }
-      alert(`An unexpected error occurred while loading the ${templateName} template.`);
-    } finally {
-      setTemplateLoading(false);
-    }
-  };
-
-  const handleTemplateTabChange = (tab: 'orderConfirmation' | 'adminReminder') => {
-    setActiveTemplateTab(tab);
-    // Load the template for the selected tab if it's not already loaded or to refresh
-    // For simplicity, we can always call loadEmailTemplate, it will use its own loading state
-    // and default values if content is not found.
-    if (tab === 'orderConfirmation' && !orderConfirmationTemplateHtml) {
-        loadEmailTemplate('orderConfirmation');
-    } else if (tab === 'adminReminder' && !adminReminderTemplateHtml) {
-        loadEmailTemplate('adminReminder');
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    const templateNameToSave = activeTemplateTab;
-    const htmlContentToSave = templateNameToSave === 'orderConfirmation' ? orderConfirmationTemplateHtml : adminReminderTemplateHtml;
-    setTemplateSaving(true);
-    console.log(`Saving ${templateNameToSave} template to Supabase...`);
-    try {
-      const { error } = await supabase
-        .from('email_templates')
-        .upsert(
-          { name: templateNameToSave, html_content: htmlContentToSave, updated_at: new Date().toISOString() },
-          { onConflict: 'name' } // This ensures it updates if 'name' exists, or inserts if not.
-        );
-
-      if (error) {
-        console.error('Error saving email template:', error);
-        alert(`Error saving template: ${error.message}`);
-      } else {
-        console.log(`${templateNameToSave} template saved successfully to Supabase.`);
-        alert(`${templateNameToSave} template saved successfully!`);
-        setIsTemplateModalOpen(false);
-      }
-    } catch (err) {
-      console.error('Unexpected error saving email template:', err);
-      alert(`An unexpected error occurred while saving the ${templateNameToSave} template.`);
-    } finally {
-      setTemplateSaving(false);
-    }
-  };
 
   useEffect(() => {
     fetchOrders();
     fetchAnalytics();
-    loadEmailTemplate('orderConfirmation'); // Load default active tab template on mount
-    // Consider loading the other template in the background or when its tab is clicked for the first time.
   }, [searchQuery, selectedStatus, dateRange, sortField, sortDirection, minAmount, maxAmount]);
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      let query = supabaseAdmin
+      let query = supabase
         .from('orders')
         .select('*, display_order_id')
         .order(sortField, { ascending: sortDirection === 'asc' });
@@ -281,7 +114,7 @@ export default function Orders() {
 
   const fetchOrderItems = async (orderId: string) => {
     try {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabase
         .from('order_items')
         .select('*')
         .eq('order_id', orderId);
@@ -297,7 +130,7 @@ export default function Orders() {
   const fetchAnalytics = async () => {
     try {
       // Query 1: Fetch data for ALL orders (for new Total Orders and new Avg Order Value)
-      const { data: allOrdersData, error: allOrdersError } = await supabaseAdmin
+      const { data: allOrdersData, error: allOrdersError } = await supabase
         .from('orders')
         .select('id, total_amount'); // Select id for count, total_amount for sum
 
@@ -316,7 +149,7 @@ export default function Orders() {
       }
 
       // Query 2: Fetch data for COMPLETED orders (for Total Revenue)
-      const { data: completedOrdersDataForRevenue, error: completedRevenueError } = await supabaseAdmin
+      const { data: completedOrdersDataForRevenue, error: completedRevenueError } = await supabase
         .from('orders')
         .select('total_amount')
         .eq('status', 'completed');
@@ -331,7 +164,7 @@ export default function Orders() {
       }
 
       // Query 3: Fetch count of PENDING orders (remains the same)
-      const { count: pendingOrdersCount, error: pendingError } = await supabaseAdmin
+      const { count: pendingOrdersCount, error: pendingError } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
@@ -503,10 +336,8 @@ export default function Orders() {
     }
   };
 
-  const handleOrderClick = async (order: Order) => {
-    const items = await fetchOrderItems(order.id);
-    setSelectedOrder({ ...order, items });
-    setIsDetailsModalOpen(true);
+  const handleOrderClick = (order: Order) => {
+    navigate(`/admin/orders/${order.id}`);
   };
 
   const deleteSelectedOrders = async () => {
@@ -517,18 +348,18 @@ export default function Orders() {
     setLoading(true);
     try {
       // Delete order items first
-      const { error: itemsError } = await supabaseAdmin
+      const { error: itemsError } = await supabase
         .from('order_items')
         .delete()
-        .eq('order_id', selectedOrderIds[0]);
+        .in('order_id', selectedOrderIds);
 
       if (itemsError) throw itemsError;
 
-      // Then delete the order
-      const { error: ordersError } = await supabaseAdmin
+      // Then delete the orders
+      const { error: ordersError } = await supabase
         .from('orders')
         .delete()
-        .eq('id', selectedOrderIds[0]);
+        .in('id', selectedOrderIds);
 
       if (ordersError) throw ordersError;
 
@@ -543,63 +374,35 @@ export default function Orders() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabaseAdmin.auth.signOut();
-      if (error) throw error;
-      navigate('/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      alert('Failed to log out. Please try again.');
-    }
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Admin Navigation */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Admin Portal</h2>
-          <div className="flex space-x-4">
-            {selectedOrderIds.length > 0 && (
-              <button
-                onClick={deleteSelectedOrders}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Selected ({selectedOrderIds.length})
-              </button>
-            )}
+    <div>
+      {/* Page Header & Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+        <div className="flex flex-wrap gap-2">
+          {selectedOrderIds.length > 0 && (
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sage-600 hover:bg-sage-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Order
-            </button>
-            <button
-              onClick={exportOrders}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sage-600 hover:bg-sage-700"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export Orders
-            </button>
-            <button
-              onClick={() => setIsTemplateModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              <Edit3 className="h-4 w-4 mr-2" />
-              Customize Email
-            </button>
-            {/* Correctly placed Logout Button */}
-            <button
-              onClick={handleLogout}
+              onClick={deleteSelectedOrders}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete ({selectedOrderIds.length})
             </button>
-          </div>
+          )}
+          <button
+            onClick={exportOrders}
+            className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-sage-600 hover:bg-sage-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Order
+          </button>
         </div>
       </div>
 
@@ -893,23 +696,6 @@ export default function Orders() {
         }}
       />
 
-      <OrderDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => {
-          setIsDetailsModalOpen(false);
-          setSelectedOrder(null);
-        }}
-        order={selectedOrder}
-        onOrderUpdated={() => {
-          fetchOrders();
-          fetchAnalytics();
-        }}
-        onOrderDeleted={() => {
-          fetchOrders();
-          fetchAnalytics();
-        }}
-      />
-
       {/* Notification Modal */}
       {isNotificationModalOpen && selectedOrderForNotification && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
@@ -945,129 +731,6 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Email Template Customization Modal */}
-      {isTemplateModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex justify-center items-center p-4">
-          <div className="relative bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-3xl mx-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold leading-6 text-gray-900">
-                Customize Email Templates
-              </h3>
-              <button onClick={() => setIsTemplateModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {/* Tabs */}
-            <div className="mb-4 border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                <button
-                  onClick={() => handleTemplateTabChange('orderConfirmation')}
-                  className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-                    activeTemplateTab === 'orderConfirmation'
-                      ? 'border-sage-500 text-sage-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Order Confirmation
-                </button>
-                <button
-                  onClick={() => handleTemplateTabChange('adminReminder')}
-                  className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-                    activeTemplateTab === 'adminReminder'
-                      ? 'border-sage-500 text-sage-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Admin Order Reminder
-                </button>
-              </nav>
-            </div>
-
-            {templateLoading && (
-              <div className="text-center p-10">
-                <p className="text-gray-500">Loading template...</p>
-              </div>
-            )}
-            {!templateLoading && (
-            <div className="flex flex-col md:flex-row md:space-x-4">
-              {/* Left Pane: Editor */}
-              <div className="md:w-1/2 flex flex-col mb-4 md:mb-0">
-                <p className="text-sm text-gray-600 mb-1">
-                  Edit the HTML for the order confirmation email. Use the following placeholders for dynamic content:
-                </p>
-                <p className="text-sm text-gray-600 mb-1">
-                  {activeTemplateTab === 'orderConfirmation'
-                    ? 'Edit the HTML for the order confirmation email. Use placeholders:'
-                    : 'Edit the HTML for the admin order reminder email. Use placeholders:'}
-                </p>
-                <ul className="list-disc list-inside text-sm text-gray-500 mb-2 pl-4 bg-gray-50 p-3 rounded-md text-xs">
-                  <li><code>{'{{customer_name}}'}</code> - Customer's full name</li>
-                  <li><code>{'{{order_id}}'}</code> - Order ID (short version)</li>
-                  <li><code>{'{{order_date}}'}</code> - Date of order (e.g., May 29, 2025)</li>
-                  <li><code>{'{{order_total}}'}</code> - Total amount of the order (e.g., $25.00)</li>
-                  <li><code>{'{{order_items_table}}'}</code> - An HTML table of items in the order</li>
-                </ul>
-                <textarea
-                  value={activeTemplateTab === 'orderConfirmation' ? orderConfirmationTemplateHtml : adminReminderTemplateHtml}
-                  onChange={(e) => activeTemplateTab === 'orderConfirmation' ? setOrderConfirmationTemplateHtml(e.target.value) : setAdminReminderTemplateHtml(e.target.value)}
-                  rows={20} // Increased rows for better editing experience
-                  className="w-full flex-grow p-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500 text-sm font-mono resize-y"
-                  placeholder="Enter email HTML here..."
-                />
-              </div>
-
-              {/* Right Pane: Preview */}
-              <div className="md:w-1/2 flex flex-col">
-                <p className="text-sm text-gray-600 mb-1">Live Preview:</p>
-                <iframe
-                  srcDoc={activeTemplateTab === 'orderConfirmation' ? orderConfirmationTemplateHtml : adminReminderTemplateHtml} // Dynamically set the HTML content
-                  title="Email Preview"
-                  className="w-full flex-grow border border-gray-300 rounded-md bg-white"
-                  sandbox="allow-same-origin" // For security, restricts iframe capabilities
-                />
-              </div>
-            </div>
-            )}
-            
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsTemplateModalOpen(false)}
-                disabled={templateSaving}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveTemplate}
-                disabled={templateSaving}
-                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 border border-transparent rounded-md shadow-sm hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50 disabled:bg-sage-400"
-              >
-                {templateSaving ? 'Saving...' : 'Save Template'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    {/* Pricing Settings Button */}
-      <button
-        type="button"
-        onClick={() => setIsPricingModalOpen(true)}
-        className="fixed bottom-4 right-4 bg-sage-600 text-white px-4 py-2 rounded-md shadow-lg hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500"
-      >
-        Pricing Settings
-      </button>
-      <PricingSettingsModal
-        isOpen={isPricingModalOpen}
-        onClose={() => setIsPricingModalOpen(false)}
-        onSaved={() => {
-          fetchOrders();
-          fetchAnalytics();
-        }}
-      />
     </div>
   );
 }
