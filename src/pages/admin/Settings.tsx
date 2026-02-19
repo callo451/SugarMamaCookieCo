@@ -22,8 +22,8 @@ export default function AdminSettings() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex gap-6">
+      <div className="mb-6 border-b border-gray-200 overflow-x-auto">
+        <nav className="-mb-px flex gap-4 sm:gap-6 min-w-max">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -31,7 +31,7 @@ export default function AdminSettings() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`inline-flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-medium transition-colors whitespace-nowrap ${
                   active
                     ? 'border-sage-600 text-sage-600'
                     : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
@@ -46,7 +46,7 @@ export default function AdminSettings() {
       </div>
 
       {/* Tab content */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
         {activeTab === 'pricing' && <PricingSettingsPanel />}
         {activeTab === 'emails' && <EmailTemplateEditor />}
         {activeTab === 'store' && <StoreInfoPanel />}
@@ -70,9 +70,9 @@ function StoreInfoPanel() {
       </p>
       <dl className="divide-y divide-gray-100">
         {info.map((item) => (
-          <div key={item.label} className="flex items-center justify-between py-3">
+          <div key={item.label} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-0.5 sm:gap-4">
             <dt className="text-sm font-medium text-gray-600">{item.label}</dt>
-            <dd className="text-sm text-gray-900">{item.value}</dd>
+            <dd className="text-sm text-gray-900 break-all">{item.value}</dd>
           </div>
         ))}
       </dl>

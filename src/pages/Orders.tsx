@@ -407,42 +407,42 @@ export default function Orders() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Revenue</p>
-              <p className="text-2xl font-semibold">{formatCurrency(analytics.totalRevenue)}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm text-gray-500 truncate">Total Revenue</p>
+              <p className="text-lg sm:text-2xl font-semibold truncate">{formatCurrency(analytics.totalRevenue)}</p>
             </div>
-            <DollarSign className="h-8 w-8 text-green-500" />
+            <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0" />
           </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Orders</p>
-              <p className="text-2xl font-semibold">{analytics.totalOrders}</p>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm text-gray-500 truncate">Total Orders</p>
+              <p className="text-lg sm:text-2xl font-semibold">{analytics.totalOrders}</p>
             </div>
-            <ShoppingBag className="h-8 w-8 text-blue-500" />
+            <ShoppingBag className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 flex-shrink-0" />
           </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Average Order Value</p>
-              <p className="text-2xl font-semibold">{formatCurrency(analytics.avgOrderValue)}</p>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm text-gray-500 truncate">Avg Order Value</p>
+              <p className="text-lg sm:text-2xl font-semibold truncate">{formatCurrency(analytics.avgOrderValue)}</p>
             </div>
-            <BarChart className="h-8 w-8 text-orange-500" />
+            <BarChart className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500 flex-shrink-0" />
           </div>
         </div>
         {/* Pending Orders Card */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending Orders</p>
-              <p className="text-2xl font-semibold">{analytics.pendingOrders ?? 0}</p>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm text-gray-500 truncate">Pending Orders</p>
+              <p className="text-lg sm:text-2xl font-semibold">{analytics.pendingOrders ?? 0}</p>
             </div>
-            <Clock className="h-8 w-8 text-yellow-500" />
+            <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 flex-shrink-0" />
           </div>
         </div>
       </div>
@@ -471,7 +471,7 @@ export default function Orders() {
           </div>
 
           {showFilters && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Date Range
@@ -568,7 +568,7 @@ export default function Orders() {
         </div>
 
         {/* Orders Table */}
-        <div className="overflow-x-auto">
+        <div>
           {orders.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingBag className="h-12 w-12 text-gray-400 mx-auto" />
@@ -585,104 +585,169 @@ export default function Orders() {
               </button>
             </div>
           ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
-                  <input
-                    type="checkbox"
-                    checked={selectedOrderIds.length === orders.length && orders.length > 0}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedOrderIds(orders.map(order => order.id));
-                      } else {
-                        setSelectedOrderIds([]);
-                      }
-                    }}
-                    className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+          <>
+            {/* Mobile card layout */}
+            <div className="divide-y divide-gray-200 md:hidden">
               {orders.map((order) => (
-                <tr 
-                  key={order.id} 
-                  className="hover:bg-gray-50 cursor-pointer" 
+                <div
+                  key={order.id}
+                  className="p-4 active:bg-gray-50 cursor-pointer"
                   onClick={() => handleOrderClick(order)}
                 >
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedOrderIds.includes(order.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedOrderIds([...selectedOrderIds, order.id]);
-                        } else {
-                          setSelectedOrderIds(selectedOrderIds.filter(id => id !== order.id));
-                        }
-                      }}
-                      className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">#{order.display_order_id || order.id.slice(0, 8)}</div>
-                    <div className="text-sm text-gray-500">{order.description}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
-                    <div className="text-sm text-gray-500">{order.customer_email}</div>
-                    {order.customer_phone && (
-                      <div className="text-xs text-gray-400">{order.customer_phone}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {formatCurrency(order.total_amount)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
-                    {formatDate(order.created_at)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleOrderClick(order); }}
-                      className="text-sage-600 hover:text-sage-900"
-                    >
-                      Details
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openNotificationModal(order); }}
-                      className="text-blue-600 hover:text-blue-900 ml-4"
-                    >
-                      <Mail className="h-4 w-4 inline mr-1" /> Resend Confirmation
-                    </button>
-                  </td>
-                </tr>
+                  <div className="flex items-start gap-3">
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedOrderIds.includes(order.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedOrderIds([...selectedOrderIds, order.id]);
+                          } else {
+                            setSelectedOrderIds(selectedOrderIds.filter(id => id !== order.id));
+                          }
+                        }}
+                        className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-900">
+                          #{order.display_order_id || order.id.slice(0, 8)}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(order.total_amount)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 truncate">{order.customer_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{order.description}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                        <span className="text-xs text-gray-400">{formatDate(order.created_at)}</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleOrderClick(order)}
+                          className="text-sage-600 hover:text-sage-900 text-xs font-medium"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={() => openNotificationModal(order)}
+                          className="text-blue-600 hover:text-blue-900 text-xs font-medium inline-flex items-center gap-1"
+                        >
+                          <Mail className="h-3 w-3" /> Resend
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop table layout */}
+            <div className="overflow-x-auto hidden md:block">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrderIds.length === orders.length && orders.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedOrderIds(orders.map(order => order.id));
+                          } else {
+                            setSelectedOrderIds([]);
+                          }
+                        }}
+                        className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order Details
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleOrderClick(order)}
+                    >
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedOrderIds.includes(order.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrderIds([...selectedOrderIds, order.id]);
+                            } else {
+                              setSelectedOrderIds(selectedOrderIds.filter(id => id !== order.id));
+                            }
+                          }}
+                          className="h-4 w-4 text-sage-600 focus:ring-sage-500 border-gray-300 rounded"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">#{order.display_order_id || order.id.slice(0, 8)}</div>
+                        <div className="text-sm text-gray-500">{order.description}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{order.customer_name}</div>
+                        <div className="text-sm text-gray-500">{order.customer_email}</div>
+                        {order.customer_phone && (
+                          <div className="text-xs text-gray-400">{order.customer_phone}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {formatCurrency(order.total_amount)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {formatDate(order.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOrderClick(order); }}
+                          className="text-sage-600 hover:text-sage-900"
+                        >
+                          Details
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openNotificationModal(order); }}
+                          className="text-blue-600 hover:text-blue-900 ml-4"
+                        >
+                          <Mail className="h-4 w-4 inline mr-1" /> Resend Confirmation
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
           )}
         </div>
       </div>
@@ -698,23 +763,23 @@ export default function Orders() {
 
       {/* Notification Modal */}
       {isNotificationModalOpen && selectedOrderForNotification && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
-          <div className="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center p-4">
+          <div className="relative bg-white p-5 sm:p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
             <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
               Send Order Notification
             </h3>
-            <div className="mb-4">
+            <div className="mb-4 space-y-1 text-sm break-words">
               <p><strong>Order ID:</strong> {selectedOrderForNotification.id}</p>
               <p><strong>Customer:</strong> {selectedOrderForNotification.customer_name} ({selectedOrderForNotification.customer_email}{selectedOrderForNotification.customer_phone ? `, ${selectedOrderForNotification.customer_phone}` : ''})</p>
               <p><strong>Status:</strong> {selectedOrderForNotification.status}</p>
               <p>An email confirmation will be sent to {selectedOrderForNotification.customer_email}.</p>
             </div>
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={closeNotificationModal} // Make sure closeNotificationModal is defined
+                onClick={closeNotificationModal}
                 disabled={sendingNotification}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -722,7 +787,7 @@ export default function Orders() {
                 type="button"
                 onClick={handleSendNotification}
                 disabled={sendingNotification}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-blue-400"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-blue-400"
               >
                 {sendingNotification ? 'Sending...' : 'Send Notification'}
               </button>

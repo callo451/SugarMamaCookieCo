@@ -93,7 +93,7 @@ export default function PricingSettingsPanel() {
             className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">12+ cookies (%)</label>
             <input

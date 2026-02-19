@@ -12,9 +12,11 @@ import {
   DollarSign,
   Calendar,
   Clock,
+  Download,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { generateOrderPdf } from '../../utils/generateOrderPdf';
 
 interface Order {
   id: string;
@@ -256,18 +258,28 @@ export default function OrderDetail() {
           </select>
 
           <button
+            onClick={() => generateOrderPdf(order, items)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export PDF</span>
+            <span className="sm:hidden">PDF</span>
+          </button>
+
+          <button
             onClick={handleResendEmail}
             disabled={sendingEmail}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Resend Email
+            <span className="hidden sm:inline">Resend Email</span>
+            <span className="sm:hidden">Email</span>
           </button>
 
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
           >
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             Delete
@@ -287,11 +299,11 @@ export default function OrderDetail() {
         <div className="space-y-6 lg:col-span-2">
           {/* Customer Info */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
               <User className="h-4 w-4 text-sage-500" />
               <h2 className="text-sm font-semibold text-gray-900">Customer Information</h2>
             </div>
-            <div className="grid gap-4 p-5 sm:grid-cols-3">
+            <div className="grid gap-4 p-4 sm:p-5 sm:grid-cols-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Name</label>
                 <input
@@ -331,11 +343,11 @@ export default function OrderDetail() {
 
           {/* Cookie Details */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
               <Cookie className="h-4 w-4 text-sage-500" />
               <h2 className="text-sm font-semibold text-gray-900">Cookie Details</h2>
             </div>
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 p-4 sm:p-5">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
                 <textarea
@@ -398,11 +410,11 @@ export default function OrderDetail() {
 
           {/* Special Requests */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
               <FileText className="h-4 w-4 text-sage-500" />
               <h2 className="text-sm font-semibold text-gray-900">Special Requests</h2>
             </div>
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 p-4 sm:p-5">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Text & Fonts</label>
                 <textarea
@@ -435,11 +447,11 @@ export default function OrderDetail() {
         <div className="space-y-6">
           {/* Pricing */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
               <DollarSign className="h-4 w-4 text-sage-500" />
               <h2 className="text-sm font-semibold text-gray-900">Pricing</h2>
             </div>
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
               <div className="mb-4">
                 <label className="mb-1 block text-xs font-medium text-gray-500">Total Amount</label>
                 <input
@@ -483,11 +495,11 @@ export default function OrderDetail() {
 
           {/* Timeline */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
               <Calendar className="h-4 w-4 text-sage-500" />
               <h2 className="text-sm font-semibold text-gray-900">Timeline</h2>
             </div>
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-50">
                   <Calendar className="h-3 w-3 text-green-600" />

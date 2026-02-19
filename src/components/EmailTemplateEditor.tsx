@@ -190,12 +190,12 @@ export default function EmailTemplateEditor() {
       </p>
 
       {/* Template selector */}
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex gap-2 overflow-x-auto">
         {TEMPLATE_TABS.map((tab) => (
           <button
             key={tab.name}
             onClick={() => { setActiveTab(tab.name); setViewMode('editor'); }}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === tab.name
                 ? 'bg-sage-100 text-sage-700'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
@@ -209,11 +209,11 @@ export default function EmailTemplateEditor() {
       <p className="mb-3 text-xs text-gray-400">{activeTabConfig.description}</p>
 
       {/* Placeholders */}
-      <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
+      <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 p-2.5 sm:p-3">
         <p className="mb-1.5 text-xs font-medium text-gray-500">Available placeholders:</p>
         <div className="flex flex-wrap gap-1.5">
           {PLACEHOLDERS[activeTab].map((p) => (
-            <code key={p} className="rounded bg-white px-2 py-0.5 text-xs text-sage-700 ring-1 ring-gray-200">
+            <code key={p} className="rounded bg-white px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs text-sage-700 ring-1 ring-gray-200 break-all">
               {p}
             </code>
           ))}
@@ -253,8 +253,8 @@ export default function EmailTemplateEditor() {
           onChange={(e) =>
             setTemplates((prev) => ({ ...prev, [activeTab]: e.target.value }))
           }
-          rows={18}
-          className="w-full rounded-lg border-gray-200 font-mono text-xs leading-relaxed text-gray-700 focus:border-sage-500 focus:ring-sage-500"
+          rows={12}
+          className="w-full rounded-lg border-gray-200 font-mono text-xs leading-relaxed text-gray-700 focus:border-sage-500 focus:ring-sage-500 sm:min-h-[400px] min-h-[250px]"
           spellCheck={false}
         />
       ) : (
@@ -262,25 +262,25 @@ export default function EmailTemplateEditor() {
           <iframe
             ref={iframeRef}
             title="Email Preview"
-            className="h-[420px] w-full bg-white"
+            className="h-[300px] sm:h-[420px] w-full bg-white"
             sandbox="allow-same-origin"
           />
         </div>
       )}
 
       {/* Actions */}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-sage-600 px-4 py-2 text-sm font-medium text-white hover:bg-sage-700 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-sage-700 disabled:opacity-50"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? 'Saving...' : 'Save Template'}
         </button>
         <button
           onClick={handleReset}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2.5 sm:py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Reset to Default

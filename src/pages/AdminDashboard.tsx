@@ -215,12 +215,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Date Range Filter */}
-      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
+      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1 w-fit overflow-x-auto">
         {DATE_RANGES.map((r) => (
           <button
             key={r.key}
             onClick={() => setDateRange(r.key)}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${
               dateRange === r.key
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Revenue Area Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-5">
           <h2 className="text-base font-semibold text-gray-900 mb-4">Revenue</h2>
           {revenueData.length === 0 ? (
             <div className="flex items-center justify-center h-[260px] text-sm text-gray-400">
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Status Donut */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-5">
           <h2 className="text-base font-semibold text-gray-900 mb-4">Order Status</h2>
           {statusData.length === 0 ? (
             <div className="flex items-center justify-center h-[260px] text-sm text-gray-400">
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 
       {/* Recent Orders */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900">Recent Orders</h2>
           <Link
             to="/admin/orders"
@@ -351,49 +351,86 @@ export default function AdminDashboard() {
             <p className="text-gray-400 text-sm">No orders in this period.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left font-medium text-gray-500 px-5 py-3">Order ID</th>
-                  <th className="text-left font-medium text-gray-500 px-5 py-3">Customer</th>
-                  <th className="text-left font-medium text-gray-500 px-5 py-3">Status</th>
-                  <th className="text-right font-medium text-gray-500 px-5 py-3">Total</th>
-                  <th className="text-right font-medium text-gray-500 px-5 py-3">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {recentOrders.map((order) => {
-                  const status = statusConfig[order.status] || statusConfig.pending;
-                  return (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/admin/orders/${order.id}`)}
-                    >
-                      <td className="px-5 py-3 font-medium text-gray-900">
-                        {order.display_order_id || order.id.slice(0, 8)}
-                      </td>
-                      <td className="px-5 py-3 text-gray-600">{order.customer_name}</td>
-                      <td className="px-5 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset ${status.className}`}
-                        >
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-right text-gray-900 font-medium">
+          <>
+            {/* Mobile card layout */}
+            <div className="divide-y divide-gray-50 sm:hidden">
+              {recentOrders.map((order) => {
+                const status = statusConfig[order.status] || statusConfig.pending;
+                return (
+                  <div
+                    key={order.id}
+                    className="px-4 py-3 active:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-sm text-gray-900">
+                        #{order.display_order_id || order.id.slice(0, 8)}
+                      </span>
+                      <span className="font-medium text-sm text-gray-900">
                         {currencyFormat.format(order.total_amount || 0)}
-                      </td>
-                      <td className="px-5 py-3 text-right text-gray-500">
-                        {dateFormat.format(new Date(order.created_at))}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 truncate mr-2">{order.customer_name}</span>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset whitespace-nowrap ${status.className}`}
+                      >
+                        {status.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {dateFormat.format(new Date(order.created_at))}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table layout */}
+            <div className="overflow-x-auto hidden sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left font-medium text-gray-500 px-5 py-3">Order ID</th>
+                    <th className="text-left font-medium text-gray-500 px-5 py-3">Customer</th>
+                    <th className="text-left font-medium text-gray-500 px-5 py-3">Status</th>
+                    <th className="text-right font-medium text-gray-500 px-5 py-3">Total</th>
+                    <th className="text-right font-medium text-gray-500 px-5 py-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {recentOrders.map((order) => {
+                    const status = statusConfig[order.status] || statusConfig.pending;
+                    return (
+                      <tr
+                        key={order.id}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/admin/orders/${order.id}`)}
+                      >
+                        <td className="px-5 py-3 font-medium text-gray-900">
+                          {order.display_order_id || order.id.slice(0, 8)}
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{order.customer_name}</td>
+                        <td className="px-5 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset ${status.className}`}
+                          >
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right text-gray-900 font-medium">
+                          {currencyFormat.format(order.total_amount || 0)}
+                        </td>
+                        <td className="px-5 py-3 text-right text-gray-500">
+                          {dateFormat.format(new Date(order.created_at))}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
