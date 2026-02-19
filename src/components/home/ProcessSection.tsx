@@ -67,7 +67,7 @@ export default function ProcessSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.3 + index * 0.15 }}
-                className="group relative overflow-hidden rounded-xl p-6 text-center hover:-translate-y-1 transition-all duration-300"
+                className="group relative rounded-xl p-6 text-center hover:-translate-y-1 transition-all duration-300"
               >
                 {/* Watermark step number */}
                 <span className="text-7xl font-bold text-sage-50 absolute -top-4 right-2 select-none pointer-events-none">

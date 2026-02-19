@@ -24,7 +24,7 @@ const collections: CollectionCard[] = [
   {
     title: 'Corporate Events',
     description: 'Professional cookies for business occasions',
-    image: '/customcollections.png',
+    image: '/corporate.png',
   },
   {
     title: 'Baby Showers',

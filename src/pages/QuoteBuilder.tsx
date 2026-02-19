@@ -22,7 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 /* ------------------------------------------------------------------ */
@@ -108,6 +108,11 @@ const pageTransition = {
 /* ------------------------------------------------------------------ */
 export default function QuoteBuilder() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
