@@ -18,8 +18,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Sugar Mama update", {
       body: data.body || "There’s an update in your workspace.",
       tag: data.tag || "sugar-mama",
-      icon: "/admin-icon-192.png",
-      badge: "/admin-icon-192.png",
+      icon: "/brand-icon-192.png",
+      badge: "/notification-badge.png",
       data: { url: path },
     }),
   );
