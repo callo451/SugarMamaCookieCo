@@ -1028,8 +1028,38 @@
 .kitchen-feedback {background:#e6ecdf;padding:14px;margin-block:16px}
 @media(max-width:1100px){.kitchen-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.kitchen-cards{grid-template-columns:1fr}.kitchen-summary{display:grid;grid-template-columns:1fr 1fr;padding:14px 0}.kitchen-summary strong{font-size:22px}.kitchen-tools{gap:8px}.kitchen-week{gap:8px}.kitchen-week h2{font-size:18px}.collection-week{grid-template-columns:1fr;overflow:visible}.collection-week>section{min-height:100px}.studio-sidebar{overflow-y:auto}}
+/* The printed kitchen sheet shares the quote/order document branding. */
+.kitchen-print-header,.kitchen-print-footer {display:none}
 @media print {
- body:has(.kitchen-page) .studio-sidebar,body:has(.kitchen-page) .studio-topbar,body:has(.kitchen-page) .studio-footer,.kitchen-tools,.kitchen-actions,.kitchen-week button {display:none!important}
- body:has(.kitchen-page) .studio-main{margin:0!important}body:has(.kitchen-page) .studio-content{padding:0!important}
- .kitchen-page{color:#000}.kitchen-cards,.collection-week{display:block;overflow:visible}.kitchen-card{margin:8px 0}.collection-week>section{min-height:0;break-inside:avoid;background:white}.kitchen-group{margin-top:18px}.kitchen-card a{color:#000;text-decoration:none}
+ @page {size:A4;margin:15mm}
+ body:has(.kitchen-page) {background:#fff!important}
+ body:has(.kitchen-page) .studio-sidebar,body:has(.kitchen-page) .studio-topbar,body:has(.kitchen-page) .studio-footer,
+ .kitchen-page .page-heading,.kitchen-actions,.kitchen-week button,.kitchen-feedback {display:none!important}
+ body:has(.kitchen-page) .studio-main{margin:0!important}
+ body:has(.kitchen-page) .studio-content{padding:0!important;max-width:none!important}
+ .kitchen-page {color:#293d32;font-family:Arial,sans-serif;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .kitchen-print-header {display:flex;justify-content:space-between;align-items:center;gap:8mm;background:#faf7f1;border-top:2mm solid #36513c;padding:7mm 6mm;margin-bottom:6mm;break-inside:avoid}
+ .kitchen-wordmark {font:28pt Georgia,'Times New Roman',serif;color:#36513c;margin:0}
+ .kitchen-wordmark-caption {font-size:8pt;letter-spacing:4px;color:#36513c;margin:2mm 0 0 1mm}
+ .kitchen-print-meta {text-align:right;font-size:8pt;line-height:1.8;color:#626658}
+ .kitchen-print-meta p {margin:0}
+ .kitchen-summary {display:flex;padding:4mm 0;margin:0;border-color:#cfd2c3;gap:4mm;font-size:9pt;break-inside:avoid}
+ .kitchen-summary strong {font-size:18pt;color:#36513c}
+ .kitchen-explainer {font-size:8pt;line-height:1.5;color:#626658;margin:3mm 0 6mm}
+ .kitchen-cards,.collection-week {display:block;overflow:visible}
+ .kitchen-group {margin-top:6mm}
+ .kitchen-group-heading,.collection-week>section>header,.kitchen-week {break-after:avoid;break-inside:avoid}
+ .kitchen-group h2,.kitchen-week h2,.collection-week h2 {font-family:Georgia,'Times New Roman',serif;color:#36513c;font-size:15pt}
+ .kitchen-group-heading {margin-bottom:3mm}
+ .kitchen-group-heading p,.collection-week header p {font-size:8pt;color:#626658}
+ .kitchen-card,.collection-week .kitchen-card {margin:0 0 4mm;padding:5mm;background:white;border:1px solid #cfd2c3;border-top:1mm solid #36513c;break-inside:avoid;box-shadow:none}
+ .kitchen-card-top {font-size:9pt;color:#36513c}
+ .kitchen-card h3 {font:16pt Georgia,'Times New Roman',serif;margin:3mm 0 2mm}
+ .kitchen-card p {font-size:10pt;line-height:1.5;margin-top:3mm;orphans:3;widows:3}
+ .kitchen-card a {color:#36513c;text-decoration:none}
+ .kitchen-card .status-badge {background:#faf7f1;color:#293d32;border:1px solid #cfd2c3;font-size:8pt}
+ .kitchen-note {background:#faf7f1;border-left:1mm solid #36513c;padding:3mm}
+ .collection-week>section {min-height:0;break-inside:auto;background:white;padding:0;border:0}
+ .kitchen-print-footer {display:flex;justify-content:space-between;gap:5mm;border-top:1px solid #cfd2c3;padding-top:3mm;margin-top:6mm;font:10pt Georgia,'Times New Roman',serif;color:#36513c;break-inside:avoid}
+ .kitchen-print-footer span:last-child {font:8pt Arial,sans-serif;color:#626658}
 }

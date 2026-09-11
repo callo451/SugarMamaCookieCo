@@ -18,20 +18,21 @@ import AdminLayout from './components/AdminLayout';
 import Customers from './pages/admin/Customers';
 import AdminSettings from './pages/admin/Settings';
 import OrderDetail from './pages/admin/OrderDetail';
+import './bakery.css';
 import { Toaster } from 'react-hot-toast';
 
 function PublicLayout() {
   return (
-    <>
+    <div className="bakery-site">
       <Navbar />
-      <div className="pt-16">
-        <main className="flex-grow">
+      <div>
+        <main id="public-main" className="flex-grow">
           <Outlet />
         </main>
       </div>
       <Footer />
       <MessengerButton />
-    </>
+    </div>
   );
 }
 

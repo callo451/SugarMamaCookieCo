@@ -577,8 +577,9 @@ export default function QuoteBuilder() {
   /*  Render                                                           */
   /* ---------------------------------------------------------------- */
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-sage-50 pt-20 pb-12 sm:pt-24 sm:pb-16">
+    <div className="min-h-screen bg-[#faf7f1] pt-10 pb-12 sm:pt-12 sm:pb-16">
       <div className="mx-auto max-w-2xl px-4 sm:px-6">
+        <header className="mb-8"><p className="bakery-kicker">LET’S PLAN YOUR COOKIES</p><h1 className="font-display text-4xl mb-4">Your custom cookie quote</h1><p>Choose your details for an estimate. Faith will confirm availability and the final price before your order is booked.</p></header>
         {/* ---- Progress bar ---- */}
         <div className="mb-8 sm:mb-12">
           <div className="flex items-center justify-between">

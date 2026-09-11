@@ -62,6 +62,10 @@ export default function Production({ calendar = false }: { calendar?: boolean })
     </article>;
   }
   return <div className="kitchen-page">
+    <header className="kitchen-print-header">
+      <div><p className="kitchen-wordmark">Sugar Mama</p><p className="kitchen-wordmark-caption">COOKIE CO.</p></div>
+      <div className="kitchen-print-meta"><p>Custom cookies · Albury-Wodonga</p><p>Kitchen sheet · {dayLabel(today)}</p><p>{calendar ? 'Collection calendar' : 'Production schedule'}</p></div>
+    </header>
     <div className="page-heading"><div><p className="eyebrow">THE KITCHEN</p><h1>{calendar ? 'Collection calendar' : 'Production board'}</h1><p className="muted">{calendar ? 'Plan the week around your active collections.' : 'What to make, when it’s due, and the details that matter.'}</p></div><div className="kitchen-tools"><button className="studio-button secondary" disabled={loading || !!saving} onClick={load}><RefreshCw size={16}/>Refresh</button><button className="studio-button" disabled={loading || !!error || !active.length} onClick={() => window.print()}><Printer size={16}/>Print kitchen sheet</button></div></div>
     <div className="kitchen-summary"><span><strong>{active.length}</strong> active orders</span><span><strong>{cookieCount(active)}</strong> cookies</span><span><strong>{overdue.length}</strong> overdue</span><span><strong>{unscheduled.length}</strong> without a date</span></div>
     <p className="kitchen-explainer">Dates use Melbourne time. Completed and cancelled orders are excluded. Status changes here do not email the customer.</p>
@@ -74,5 +78,6 @@ export default function Production({ calendar = false }: { calendar?: boolean })
         {unscheduled.length > 0 && <section className="kitchen-group"><h2>Needs a collection date · {unscheduled.length}</h2><p>Open an order to set its date.</p><div className="kitchen-cards">{unscheduled.map(card)}</div></section>}
       </> : groups.length ? groups.map(([day, rows]) => <section className="kitchen-group" key={day || 'unscheduled'}><div className="kitchen-group-heading"><h2>{day ? dayLabel(day) : 'Needs a collection date'}{day && day < today && <span className="kitchen-overdue">Overdue</span>}{day === today && <span>Today</span>}</h2><p>{rows.length} orders · {cookieCount(rows)} cookies</p></div><div className="kitchen-cards">{rows.map(card)}</div></section>) : <div className="studio-empty"><h3>The kitchen is all caught up.</h3><p>Active orders will appear here as they come in.</p><Link to="/admin/orders">View all orders</Link></div>}
     </>}
+    <footer className="kitchen-print-footer"><span>Baked local. Made personal.</span><span>Sugar Mama Cookie Co. · Kitchen copy</span></footer>
   </div>;
 }
