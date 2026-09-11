@@ -1,84 +1,72 @@
-import { useState } from 'react';
-import { DollarSign, Mail, Store } from 'lucide-react';
-import PricingSettingsPanel from '../../components/PricingSettingsPanel';
-import EmailTemplateEditor from '../../components/EmailTemplateEditor';
-
-type Tab = 'pricing' | 'emails' | 'store';
-
-const tabs: { key: Tab; label: string; icon: typeof DollarSign }[] = [
-  { key: 'pricing', label: 'Pricing', icon: DollarSign },
-  { key: 'emails', label: 'Email Templates', icon: Mail },
-  { key: 'store', label: 'Store Info', icon: Store },
-];
-
-export default function AdminSettings() {
-  const [activeTab, setActiveTab] = useState<Tab>('pricing');
-
+import { useSearchParams } from "react-router-dom";
+import PricingSettingsPanel from "../../components/PricingSettingsPanel";
+import EmailTemplateEditor from "../../components/EmailTemplateEditor";
+import NotificationSettings from "../../components/admin/NotificationSettings";
+import Users from "../Users";
+import { usePortalAuth } from "../../auth/PortalAuth";
+export default function Settings() {
+  const [params, setParams] = useSearchParams();
+  const { role } = usePortalAuth();
+  const tabs = [
+    { key: "pricing", label: "Pricing" },
+    { key: "emails", label: "Email templates" },
+    { key: "notifications", label: "Notifications" },
+    ...(role === "owner" ? [{ key: "users", label: "Users" }] : []),
+    { key: "store", label: "Store information" },
+  ];
+  const active = tabs.some((t) => t.key === params.get("tab"))
+    ? params.get("tab")
+    : "pricing";
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="mt-1 text-gray-500">Manage pricing, email templates, and store information.</p>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">MAKE YOURSELF AT HOME</p>
+          <h1>Settings</h1>
+          <p className="muted">The details that keep your business running.</p>
+        </div>
       </div>
-
-      {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200 overflow-x-auto">
-        <nav className="-mb-px flex gap-4 sm:gap-6 min-w-max">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`inline-flex items-center gap-2 border-b-2 px-1 pb-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                  active
-                    ? 'border-sage-600 text-sage-600'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Tab content */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
-        {activeTab === 'pricing' && <PricingSettingsPanel />}
-        {activeTab === 'emails' && <EmailTemplateEditor />}
-        {activeTab === 'store' && <StoreInfoPanel />}
-      </div>
-    </div>
-  );
-}
-
-function StoreInfoPanel() {
-  const info = [
-    { label: 'Business Name', value: 'Sugar Mama Cookie Co' },
-    { label: 'Location', value: 'Albury-Wodonga, Australia' },
-    { label: 'Email', value: 'hello@sugarmamacookieco.com.au' },
-    { label: 'Website', value: 'sugarmamacookieco.com.au' },
-  ];
-
-  return (
-    <div className="max-w-lg">
-      <p className="mb-6 text-sm text-gray-500">
-        Basic store information displayed across the site and in email templates.
-      </p>
-      <dl className="divide-y divide-gray-100">
-        {info.map((item) => (
-          <div key={item.label} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-0.5 sm:gap-4">
-            <dt className="text-sm font-medium text-gray-600">{item.label}</dt>
-            <dd className="text-sm text-gray-900 break-all">{item.value}</dd>
-          </div>
+      <nav className="settings-tabs" aria-label="Settings sections">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            aria-current={active === t.key ? "page" : undefined}
+            className={active === t.key ? "active" : ""}
+            onClick={() => setParams({ tab: t.key })}
+          >
+            {t.label}
+          </button>
         ))}
-      </dl>
-      <p className="mt-6 text-xs text-gray-400">
-        Contact your developer to update store information.
-      </p>
+      </nav>
+      {active === "pricing" && (
+        <div className="studio-panel p-6">
+          <PricingSettingsPanel />
+        </div>
+      )}
+      {active === "emails" && (
+        <div className="studio-panel p-6">
+          <EmailTemplateEditor />
+        </div>
+      )}
+      {active === "notifications" && <NotificationSettings />}
+      {active === "users" && <Users />}
+      {active === "store" && (
+        <section className="settings-section">
+          <h2>Made in Albury–Wodonga.</h2>
+          <p className="muted">Your store’s contact details.</p>
+          {[
+            ["Business", "Sugar Mama Cookie Co."],
+            ["Email", "hello@sugarmamacookieco.com.au"],
+            ["Phone", "+61 412 480 274"],
+            ["Location", "Albury–Wodonga, Australia"],
+          ].map(([label, value]) => (
+            <div className="settings-row" key={label}>
+              <p>{label}</p>
+              <span>{value}</span>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

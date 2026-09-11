@@ -1,3 +1,4 @@
+import { mailResponse } from '../_shared/zoho-mail.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const corsHeaders = {
@@ -12,9 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
-      console.error('RESEND_API_KEY is not set');
+    const ZOHO_REFRESH_TOKEN = Deno.env.get('ZOHO_REFRESH_TOKEN');
+    if (!ZOHO_REFRESH_TOKEN) {
+      console.error('ZOHO_REFRESH_TOKEN is not set');
       return new Response(
         JSON.stringify({ error: 'Email service is not configured.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -39,7 +40,7 @@ serve(async (req) => {
       );
     }
 
-    const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'Sugar Mama Cookie Co <no-reply@sugarmamacookieco.com.au>';
+    const fromEmail = Deno.env.get('ZOHO_FROM_EMAIL') || 'Sugar Mama Cookie Co <no-reply@sugarmamacookieco.com.au>';
     const toEmail = 'hello@sugarmamacookieco.com.au';
 
     const now = new Date();
@@ -104,32 +105,25 @@ serve(async (req) => {
 
     console.log(`[${now.toISOString()}] Sending contact message from ${email}`);
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const res = await mailResponse({
         from: fromEmail,
         to: [toEmail],
         subject: `New message from ${name} — Sugar Mama Cookie Co`,
         html: htmlBody,
         reply_to: email,
-      }),
-    });
+      });
 
     const responseBody = await res.json();
 
     if (!res.ok) {
-      console.error(`Resend API error (${res.status}):`, responseBody);
+      console.error(`Zoho Mail API error (${res.status}):`, responseBody);
       return new Response(
         JSON.stringify({ error: 'Failed to send message. Please try again.' }),
         { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    console.log(`Contact email sent successfully. Resend ID: ${responseBody.id}`);
+    console.log(`Contact email sent successfully. Zoho Mail ID: ${responseBody.id}`);
 
     return new Response(
       JSON.stringify({ message: 'Message sent successfully', id: responseBody.id }),

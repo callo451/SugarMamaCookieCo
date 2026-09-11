@@ -1,251 +1,215 @@
-import { useState, useEffect } from 'react';
-import { Users as UsersIcon, Search, Shield, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-
-interface User {
-  id: string;
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { usePortalAuth } from "../auth/PortalAuth";
+import { supabase } from "../lib/supabase";
+interface Member {
+  user_id: string;
   email: string;
-  created_at: string;
-  raw_user_meta_data: {
-    is_admin?: boolean;
-  };
-  last_sign_in_at: string | null;
+  role: "owner" | "staff";
+  active: boolean;
+  invited_at: string;
 }
-
-export default function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+async function teamAction(body: object) {
+  const { data, error } = await supabase.functions.invoke("manage-team", {
+    body,
+  });
+  if (error) {
+    let message =
+      "User management is unavailable. Please check the Supabase function setup.";
     try {
-      const { data, error } = await supabase
-        .from('auth_users_view')
-        .select('*');
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+      const payload = await error.context.json();
+      message = payload.error || message;
+    } catch {
+      /* Transport errors have no JSON response. */
+    }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+export default function Users() {
+  const { role } = usePortalAuth();
+  const [members, setMembers] = useState<Member[]>([]);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [revoking, setRevoking] = useState<Member | null>(null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await teamAction({ action: "list" });
+      setMembers(data.members);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load users");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleToggleAdmin = async (user: User) => {
+  }, []);
+  useEffect(() => {
+    if (role === "owner") void load();
+  }, [role, load]);
+  async function invite(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      const { data, error } = await supabase.rpc('toggle_user_admin', {
-        user_id: user.id
-      });
-
-      if (error) throw error;
-      fetchUsers();
-    } catch (error) {
-      console.error('Error updating user:', error);
+      await teamAction({ action: "invite", email });
+      setEmail("");
+      setMessage(
+        "Invitation sent. They can use the email link to choose their password.",
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Invitation failed");
+    } finally {
+      setBusy(false);
     }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this user? This action cannot be undone.');
-    if (!confirmed) return;
+  }
+  async function change(member: Member, action: "revoke" | "restore") {
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      const { error } = await supabase.rpc('delete_user', {
-        user_id: userId
-      });
-
-      if (error) throw error;
-      fetchUsers();
-    } catch (error) {
-      console.error('Error deleting user:', error);
+      await teamAction({ action, userId: member.user_id });
+      setRevoking(null);
+      setMessage(
+        action === "revoke"
+          ? "Access removed. Order history is preserved."
+          : "Access restored.",
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update access");
+    } finally {
+      setBusy(false);
     }
-  };
-
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+  }
+  if (role !== "owner")
+    return (
+      <div className="settings-section">
+        <h2>Users</h2>
+        <p className="muted">
+          Only the owner can invite users or change access.
+        </p>
       </div>
-
-      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
-              />
-            </div>
+    );
+  return (
+    <section className="settings-section">
+      <h2>A small, trusted team.</h2>
+      <p className="muted">
+        Invite someone to manage orders and customers. Only you can manage user
+        access. There is no public registration.
+      </p>
+      <form className="team-form" onSubmit={invite}>
+        <label>
+          Email address
+          <input
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@example.com"
+          />
+        </label>
+        <button className="studio-button" disabled={busy}>
+          Send invitation
+        </button>
+      </form>
+      {error && (
+        <p className="studio-error" role="alert">
+          {error}{" "}
+          <button
+            onClick={() => {
+              setError("");
+              void load();
+            }}
+          >
+            Retry
+          </button>
+        </p>
+      )}
+      {message && (
+        <p className="studio-notice" role="status">
+          {message}
+        </p>
+      )}
+      {loading ? (
+        <p role="status">Loading users…</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="studio-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Access</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m) => (
+                <tr key={m.user_id}>
+                  <td>{m.email}</td>
+                  <td>{m.role === "owner" ? "Owner" : "Staff"}</td>
+                  <td>{m.active ? "Enabled" : "Removed"}</td>
+                  <td>
+                    {m.role === "owner" ? (
+                      <span className="muted">Protected</span>
+                    ) : (
+                      <button
+                        disabled={busy}
+                        className="text-button"
+                        onClick={() =>
+                          m.active ? setRevoking(m) : change(m, "restore")
+                        }
+                      >
+                        {m.active ? "Remove access" : "Restore access"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {revoking && (
+        <div
+          className="studio-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-title"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !busy) setRevoking(null);
+          }}
+        >
+          <div>
+            <h2 id="remove-title">Remove access?</h2>
+            <p>
+              {revoking.email} will no longer be able to use the workspace.
+              Their order history will stay intact.
+            </p>
+            <button
+              className="studio-button danger"
+              disabled={busy}
+              onClick={() => change(revoking, "revoke")}
+            >
+              Remove access
+            </button>{" "}
+            <button
+              autoFocus
+              className="studio-button secondary"
+              disabled={busy}
+              onClick={() => setRevoking(null)}
+            >
+              Cancel
+            </button>
           </div>
         </div>
-
-        <div>
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage-600 mx-auto" />
-              <p className="mt-4 text-gray-500">Loading users...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-12">
-              <UsersIcon className="h-12 w-12 text-gray-400 mx-auto" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No Users Found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {searchQuery ? 'Try adjusting your search' : 'Start by inviting users to the platform'}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Mobile card layout */}
-              <div className="divide-y divide-gray-200 md:hidden">
-                {filteredUsers.map((user) => (
-                  <div key={user.id} className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-sage-100 flex items-center justify-center">
-                            <span className="text-sage-600 font-medium">
-                              {user.email[0].toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {user.email}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            ID: {user.id.slice(0, 8)}...
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-900 p-2 flex-shrink-0"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <button
-                        onClick={() => handleToggleAdmin(user)}
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          user.raw_user_meta_data?.is_admin
-                            ? 'bg-sage-100 text-sage-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        <Shield className="h-3 w-3 mr-1" />
-                        {user.raw_user_meta_data?.is_admin ? 'Admin' : 'User'}
-                      </button>
-                      <span className="text-xs text-gray-500">
-                        Last in: {formatDate(user.last_sign_in_at)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop table layout */}
-              <div className="overflow-x-auto hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        User
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Role
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Last Sign In
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Created At
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-sage-100 flex items-center justify-center">
-                                <span className="text-sage-600 font-medium">
-                                  {user.email[0].toUpperCase()}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">
-                                {user.email}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                ID: {user.id.slice(0, 8)}...
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleToggleAdmin(user)}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                              user.raw_user_meta_data?.is_admin
-                                ? 'bg-sage-100 text-sage-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            <Shield className="h-3 w-3 mr-1" />
-                            {user.raw_user_meta_data?.is_admin ? 'Admin' : 'User'}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(user.last_sign_in_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(user.created_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

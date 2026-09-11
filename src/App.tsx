@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -11,6 +10,8 @@ import Orders from './pages/Orders';
 import Checkout from './pages/Checkout';
 import AdminDashboard from './pages/AdminDashboard';
 import Users from './pages/Users';
+import Activity from './pages/admin/Activity';
+import Production from './pages/admin/Production';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -52,10 +53,17 @@ function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="orders/:id" element={<OrderDetail />} />
             <Route path="users" element={<Users />} />
+            <Route path="activity" element={<Activity />} />
+            <Route path="production" element={<Production />} />
+            <Route path="calendar" element={<Production calendar />} />
             <Route path="customers" element={<Customers />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<Login />} />
+          <Route path="/admin/set-password" element={<Login />} />
+          <Route path="/auth/set-password" element={<Login />} />
           {/* Public routes with Navbar/Footer */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
@@ -63,7 +71,7 @@ function App() {
             <Route path="/quote-builder" element={<QuoteBuilder />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route path="/login" element={<Login />} />
+
           </Route>
         </Routes>
       </div>

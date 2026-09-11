@@ -1,12 +1,13 @@
+import { mailResponse } from '../_shared/zoho-mail.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const ZOHO_REFRESH_TOKEN = Deno.env.get("ZOHO_REFRESH_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
 const ADMIN_EMAIL_TO = "hello@sugarmamacookieco.com.au";
-const DEFAULT_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "delivery@sugarmamacookieco.com.au"; // Fallback if RESEND_FROM_EMAIL is not set
+const DEFAULT_FROM_EMAIL = Deno.env.get("ZOHO_FROM_EMAIL") || "delivery@sugarmamacookieco.com.au"; // Fallback if ZOHO_FROM_EMAIL is not set
 const ADMIN_REMINDER_TEMPLATE_NAME = 'admin_order_reminder';
 
 console.log('Edge Function send-admin-reminder started.');
@@ -82,8 +83,8 @@ serve(async (req: Request) => {
     });
   }
 
-  if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error("[${new Date().toISOString()}] Missing one or more required environment variables (RESEND_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY).");
+  if (!ZOHO_REFRESH_TOKEN || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error("[${new Date().toISOString()}] Missing one or more required environment variables (ZOHO_REFRESH_TOKEN, SUPABASE_URL, SUPABASE_ANON_KEY).");
     return new Response(JSON.stringify({ error: "Server configuration error." }), {
       status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
@@ -126,35 +127,28 @@ serve(async (req: Request) => {
 
     const subject = `Order Reminder: Order #${String(orderData.order_id).substring(0,8)} Requires Attention`;
 
-    const resendPayload = {
+    const mailPayload = {
       from: DEFAULT_FROM_EMAIL,
       to: ADMIN_EMAIL_TO,
       subject: subject,
       html: htmlContent,
     };
 
-    console.log(`[${new Date().toISOString()}] Sending admin reminder email to ${ADMIN_EMAIL_TO} via Resend. Subject: ${subject}`);
+    console.log(`[${new Date().toISOString()}] Sending admin reminder email to ${ADMIN_EMAIL_TO} via Zoho Mail. Subject: ${subject}`);
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify(resendPayload),
-    });
+    const res = await mailResponse(mailPayload);
 
     const responseBody = await res.json();
 
     if (!res.ok) {
-      console.error(`[${new Date().toISOString()}] Resend API error (status ${res.status}):`, responseBody);
-      return new Response(JSON.stringify({ error: 'Failed to send email via Resend.', details: responseBody }), {
+      console.error(`[${new Date().toISOString()}] Zoho Mail API error (status ${res.status}):`, responseBody);
+      return new Response(JSON.stringify({ error: 'Failed to send email via Zoho Mail.', details: responseBody }), {
         status: res.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
 
-    console.log(`[${new Date().toISOString()}] Admin reminder email sent successfully. Resend response:`, responseBody);
-    return new Response(JSON.stringify({ message: "Admin reminder email sent successfully", resendResponse: responseBody }), {
+    console.log(`[${new Date().toISOString()}] Admin reminder email sent successfully. Zoho Mail response:`, responseBody);
+    return new Response(JSON.stringify({ message: "Admin reminder email sent successfully", mailResult: responseBody }), {
       status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
 

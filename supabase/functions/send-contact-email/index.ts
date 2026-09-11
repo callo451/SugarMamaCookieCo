@@ -1,3 +1,4 @@
+import { mailResponse } from '../_shared/zoho-mail.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
@@ -41,14 +42,8 @@ serve(async (req) => {
     // Process each submission
     for (const submission of submissions) {
       try {
-        // Send email using Resend
-        const emailResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        // Send email using Zoho Mail
+        const emailResponse = await mailResponse({
             from: 'Sugar Mama Cookie Co <no-reply@sugarmamacookieco.com>',
             to: submission.recipient_email,
             subject: `New Contact Form Submission from ${submission.name}`,
@@ -68,8 +63,7 @@ serve(async (req) => {
                 </div>
               </div>
             `,
-          }),
-        });
+          });
 
         if (!emailResponse.ok) {
           throw new Error(`Failed to send email: ${emailResponse.statusText}`);

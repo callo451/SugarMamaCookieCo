@@ -1,6 +1,13 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState } from "react";
 import {
+  Outlet,
+  NavLink,
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import {
+  ArrowUpRight,
   LayoutDashboard,
   ShoppingBag,
   Users,
@@ -8,156 +15,135 @@ import {
   Menu,
   X,
   LogOut,
+  Bell,
   Search,
-  Cookie,
-} from 'lucide-react';
-import { supabase } from '../lib/supabase';
-
-const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, to: '/admin', end: true },
-  { label: 'Orders', icon: ShoppingBag, to: '/admin/orders' },
-  { label: 'Customers', icon: Users, to: '/admin/customers' },
+  CalendarDays,
+  ClipboardList,
+} from "lucide-react";
+import { stopDeviceNotifications } from "../lib/portal";
+import { supabase } from "../lib/supabase";
+import { usePortalAuth } from "../auth/PortalAuth";
+const navigation = [
+  { label: "Overview", to: "/admin", icon: LayoutDashboard, end: true },
+  { label: "Orders", to: "/admin/orders", icon: ShoppingBag },
+  { label: "Production", to: "/admin/production", icon: ClipboardList },
+  { label: "Collections", to: "/admin/calendar", icon: CalendarDays },
+  { label: "Customers", to: "/admin/customers", icon: Users },
+  { label: "Activity", to: "/admin/activity", icon: Bell },
+  { label: "Settings", to: "/admin/settings", icon: Settings },
 ];
-
-const bottomNavItems = [
-  { label: 'Settings', icon: Settings, to: '/admin/settings' },
-];
-
 export default function AdminLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [logoutError, setLogoutError] = useState("");
+  const { user, role } = usePortalAuth();
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
-  const linkClasses = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-      isActive
-        ? 'bg-sage-600 text-white shadow-sm'
-        : 'text-gray-600 hover:bg-sage-50 hover:text-gray-900'
-    }`;
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2.5 px-4 py-5 border-b border-gray-100">
-        <Cookie className="h-7 w-7 text-sage-600 flex-shrink-0" />
-        <span className="text-base font-semibold text-gray-900 truncate">
-          Sugar Mama
-        </span>
-      </div>
-
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={linkClasses}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-
-        <div className="my-4 border-t border-gray-100" />
-
-        {bottomNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={linkClasses}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="px-3 py-4 border-t border-gray-100">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200 w-full"
-        >
-          <LogOut className="h-5 w-5 flex-shrink-0" />
-          <span>Log out</span>
-        </button>
-      </div>
-    </div>
-  );
-
+  const { pathname } = useLocation();
+  async function logout() {
+    await stopDeviceNotifications();
+    const { error } = await supabase.auth.signOut();
+    if (error) setLogoutError("Could not sign out. Please try again.");
+    else navigate("/admin/login");
+  }
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+    <div className="studio">
+      {open && (
+        <button
+          aria-label="Close navigation"
+          className="studio-overlay"
+          onClick={() => setOpen(false)}
         />
       )}
-
-      {/* Mobile sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:hidden ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="absolute top-4 right-3">
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <SidebarContent />
-      </aside>
-
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col bg-white border-r border-gray-200">
-        <SidebarContent />
-      </aside>
-
-      {/* Main content area */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
-        {/* Top header bar */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-200">
-          <div className="flex items-center justify-between h-14 px-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors lg:hidden"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <div className="relative hidden sm:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-9 pr-4 py-1.5 w-64 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent placeholder-gray-400 transition-all"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Log out</span>
-              </button>
+      <aside className={`studio-sidebar ${open ? "is-open" : ""}`}>
+        <Link to="/admin" className="studio-wordmark">
+          Sugar Mama<span>THE WORKSPACE</span>
+        </Link>
+        <button
+          className="mobile-close"
+          aria-label="Close navigation"
+          onClick={() => setOpen(false)}
+        >
+          <X />
+        </button>
+        <p className="sidebar-caption">A GOOD DAY STARTS HERE</p>
+        <nav>
+          {navigation.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <Link to="/" className="shop-link">
+            Visit the shop
+            <ArrowUpRight size={16} />
+          </Link>
+          <div className="team-identity">
+            <span className="initial">
+              {user?.email?.[0]?.toUpperCase() || "S"}
+            </span>
+            <div>
+              <strong>{role === "owner" ? "Owner" : "Team member"}</strong>
+              <span title={user?.email}>{user?.email}</span>
             </div>
           </div>
+          <button onClick={logout}>
+            <LogOut size={16} /> Sign out
+          </button>
+          {logoutError && <p role="alert">{logoutError}</p>}
+        </div>
+      </aside>
+      <div className="studio-main">
+        <header className="studio-topbar">
+          <button
+            className="mobile-menu"
+            aria-label="Open navigation"
+            onClick={() => setOpen(true)}
+          >
+            <Menu size={22} />
+          </button>
+          <span className="breadcrumb">
+            Workspace <span>/</span>{" "}
+            {navigation.find(
+              (n) => n.to !== "/admin" && pathname.startsWith(n.to),
+            )?.label || "Overview"}
+          </span>
+          <form
+            className="studio-search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              navigate(`/admin/orders?q=${encodeURIComponent(search.trim())}`);
+            }}
+          >
+            <Search size={16} />
+            <input
+              aria-label="Search orders"
+              placeholder="Find an order or customer"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
+          <Link
+            to="/admin/activity"
+            aria-label="View notifications"
+            className="topbar-bell"
+          >
+            <Bell size={20} />
+          </Link>
         </header>
-
-        {/* Page content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="studio-content">
           <Outlet />
         </main>
+        <footer className="studio-footer">
+          SUGAR MAMA COOKIE CO.<span>Good things, made with care.</span>
+        </footer>
       </div>
     </div>
   );

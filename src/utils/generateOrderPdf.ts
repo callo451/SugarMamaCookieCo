@@ -127,7 +127,7 @@ function drawField(
 /**
  * Draw two fields side by side. Returns the new Y position.
  */
-function drawFieldPair(
+export function drawFieldPair(
   doc: jsPDF,
   label1: string,
   value1: string,

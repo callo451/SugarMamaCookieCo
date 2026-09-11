@@ -1,15 +1,16 @@
+import { mailResponse } from '../_shared/zoho-mail.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Environment variables from Supabase secrets
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const ZOHO_REFRESH_TOKEN = Deno.env.get("ZOHO_REFRESH_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
+const ZOHO_FROM_EMAIL = Deno.env.get("ZOHO_FROM_EMAIL");
 
 // Constants
 const ADMIN_EMAIL_TO = "hello@sugarmamacookieco.com.au";
-const DEFAULT_SENDER_EMAIL = RESEND_FROM_EMAIL || "orders@sugarmamacookieco.com.au"; // Fallback if RESEND_FROM_EMAIL is not set
+const DEFAULT_SENDER_EMAIL = ZOHO_FROM_EMAIL || "orders@sugarmamacookieco.com.au"; // Fallback if ZOHO_FROM_EMAIL is not set
 const ADMIN_NEW_ORDER_TEMPLATE_NAME = 'admin_new_order_alert';
 
 console.log('Edge Function send-admin-new-order-alert started.');
@@ -101,7 +102,7 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
   }
 
-  if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_ANON_KEY || !DEFAULT_SENDER_EMAIL) {
+  if (!ZOHO_REFRESH_TOKEN || !SUPABASE_URL || !SUPABASE_ANON_KEY || !DEFAULT_SENDER_EMAIL) {
     console.error("[${new Date().toISOString()}] Missing one or more required environment variables or default sender email.");
     return new Response(JSON.stringify({ error: "Server configuration error." }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
@@ -148,7 +149,7 @@ Deno.serve(async (req: Request) => {
 
     const subject = `🎉 New Order Received! (#${orderData.order_number}) - Sugar Mama Cookie Co`;
 
-    const resendPayload = {
+    const mailPayload = {
       from: DEFAULT_SENDER_EMAIL,
       to: ADMIN_EMAIL_TO,
       subject: subject,
@@ -156,20 +157,16 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log(`[${new Date().toISOString()}] Sending new order alert to ${ADMIN_EMAIL_TO}. Subject: ${subject}`);
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
-      body: JSON.stringify(resendPayload),
-    });
+    const res = await mailResponse(mailPayload);
 
     const responseBody = await res.json();
     if (!res.ok) {
-      console.error(`[${new Date().toISOString()}] Resend API error (status ${res.status}):`, responseBody);
-      return new Response(JSON.stringify({ error: 'Failed to send email via Resend.', details: responseBody }), { status: res.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+      console.error(`[${new Date().toISOString()}] Zoho Mail API error (status ${res.status}):`, responseBody);
+      return new Response(JSON.stringify({ error: 'Failed to send email via Zoho Mail.', details: responseBody }), { status: res.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
 
-    console.log(`[${new Date().toISOString()}] Admin new order alert email sent successfully. Resend ID: ${responseBody.id}`);
-    return new Response(JSON.stringify({ message: "Admin new order alert email sent successfully", resendResponse: responseBody }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    console.log(`[${new Date().toISOString()}] Admin new order alert email sent successfully. Zoho Mail ID: ${responseBody.id}`);
+    return new Response(JSON.stringify({ message: "Admin new order alert email sent successfully", mailResult: responseBody }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Unhandled error in send-admin-new-order-alert:`, error);

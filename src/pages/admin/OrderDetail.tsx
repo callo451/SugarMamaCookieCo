@@ -27,6 +27,7 @@ interface Order {
   customer_name: string;
   customer_email: string;
   customer_phone?: string;
+  collection_date?: string | null;
   quantity: number;
   description: string;
   category: string;
@@ -130,6 +131,7 @@ export default function OrderDetail() {
       toast.success('Order updated');
     } catch (err) {
       console.error('Error updating order:', err);
+      setEditedOrder(order);
       toast.error('Failed to update order');
     } finally {
       setSaving(false);
@@ -143,7 +145,7 @@ export default function OrderDetail() {
     const { name, value } = e.target;
     setEditedOrder({
       ...editedOrder,
-      [name]: name === 'total_amount' || name === 'quantity' ? parseFloat(value) || 0 : value,
+      [name]: name === 'collection_date' ? (value || null) : name === 'total_amount' || name === 'quantity' ? parseFloat(value) || 0 : value,
     });
   };
 
@@ -294,7 +296,8 @@ export default function OrderDetail() {
       </div>
 
       {/* Content grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className="studio-panel p-5 mb-6"><label htmlFor="collection_date" className="block text-sm font-medium mb-2">Collection date</label><input id="collection_date" name="collection_date" type="date" value={editedOrder.collection_date || ''} onChange={handleInputChange} onBlur={() => handleBlur('collection_date')} disabled={saving} className="rounded border-gray-300"/><p className="text-xs text-gray-500 mt-2">Used in your upcoming collections schedule.</p></section>
+<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left column */}
         <div className="space-y-6 lg:col-span-2">
           {/* Customer Info */}

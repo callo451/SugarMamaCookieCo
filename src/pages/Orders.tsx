@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ShoppingBag, Download, Filter, Search, ArrowUpDown, BarChart, DollarSign, Plus, Trash2, Mail, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import OrderModal from '../components/OrderModal';
@@ -45,12 +45,14 @@ interface Analytics {
 
 export default function Orders() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [searchQuery, setSearchQuery] = useState(params.get('q') || '');
   const [showFilters, setShowFilters] = useState(false);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
-  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(params.get('status') ? [params.get('status')!] : []);
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [minAmount, setMinAmount] = useState('');
@@ -62,7 +64,8 @@ export default function Orders() {
     avgOrderValue: 0,
     pendingOrders: 0 // Initialize pendingOrders
   });
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(params.get('new') === '1');
+  useEffect(() => { setSearchQuery(params.get('q') || ''); setSelectedStatus(params.get('status') ? [params.get('status')!] : []); if(params.get('new') === '1') setIsModalOpen(true); }, [params]);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [selectedOrderForNotification, setSelectedOrderForNotification] = useState<Order | null>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
@@ -75,6 +78,7 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       let query = supabase
         .from('orders')
@@ -83,7 +87,8 @@ export default function Orders() {
 
       // Apply filters if they exist
       if (searchQuery) {
-        query = query.or(`customer_email.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%,customer_phone.ilike.%${searchQuery}%`);
+        const term = searchQuery.replace(/[,%()\\]/g, ' ').trim();
+        query = query.or(`customer_email.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%,display_order_id.ilike.%${term}%`);
       }
       if (selectedStatus && selectedStatus.length > 0) {
         query = query.in('status', selectedStatus);
@@ -107,6 +112,7 @@ export default function Orders() {
       setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setLoadError('Orders could not be loaded. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -406,8 +412,10 @@ export default function Orders() {
         </div>
       </div>
 
+      {loading && <p role="status" className="muted mb-4">Loading orders…</p>}
+      {loadError && <div role="alert" className="studio-error">{loadError} <button onClick={fetchOrders}>Retry</button></div>}
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+      <div className="order-stats grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">

@@ -41,7 +41,7 @@ const ContactForm = () => {
     setErrorMessage('');
 
     try {
-      const { data, error } = await supabase.functions.invoke('send-contact-message', {
+      const { error } = await supabase.functions.invoke('send-contact-message', {
         body: {
           name: formData.name.trim(),
           email: formData.email.trim(),

@@ -1,47 +1,45 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-
-interface ProtectedRouteProps {
-  children: ReactNode;
-}
-
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [authState, setAuthState] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.user_metadata?.is_admin === true) {
-          setAuthState('authorized');
-        } else {
-          setAuthState('unauthorized');
-        }
-      } catch (error) {
-        console.error('Error in checkAuth:', error);
-        setAuthState('unauthorized');
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  if (authState === 'loading') {
+import { ReactNode } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { usePortalAuth } from "../auth/PortalAuth";
+import { stopDeviceNotifications } from "../lib/portal";
+import { supabase } from "../lib/supabase";
+export default function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { loading, user, role, error, refresh } = usePortalAuth();
+  const location = useLocation();
+  if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-sage-50/50 to-white">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 text-sage-600 animate-spin mx-auto" />
-          <p className="mt-2 text-sm text-gray-600">Verifying access...</p>
+      <div className="portal-auth-status" role="status">
+        Checking your access…
+      </div>
+    );
+  if (!user)
+    return (
+      <Navigate to="/admin/login" state={{ from: location.pathname }} replace />
+    );
+  if (!role)
+    return (
+      <div className="portal-auth-status">
+        <div>
+          <p className="eyebrow">SUGAR MAMA / PRIVATE WORKSPACE</p>
+          <h1>Access unavailable</h1>
+          <p>
+            {error ||
+              "This account has not been invited, or its access has been removed. Contact the owner for access."}
+          </p>
+          <button className="studio-button" onClick={refresh}>
+            Try again
+          </button>{" "}
+          <button
+            className="studio-button secondary"
+            onClick={async () => {
+              await stopDeviceNotifications();
+              await supabase.auth.signOut();
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
     );
-  }
-
-  if (authState === 'unauthorized') {
-    return <Navigate to="/login" replace />;
-  }
-
   return <>{children}</>;
 }

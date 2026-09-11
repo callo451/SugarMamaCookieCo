@@ -1,20 +1,21 @@
+import { mailResponse } from '../_shared/zoho-mail.ts';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"; // Supabase types
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'; // Supabase client
 
 // --- Environment Variables ---
 // IMPORTANT: Set these in your Supabase project's Edge Function settings:
-// 1. RESEND_API_KEY: Your Resend API key.
+// 1. ZOHO_REFRESH_TOKEN: Your Zoho OAuth refresh token; see ZOHO_SETUP.md for all required secrets.
 // 2. SUPABASE_URL: Your Supabase project URL.
 // 3. SUPABASE_ANON_KEY: Your Supabase project anon key.
-// 4. RESEND_FROM_EMAIL (Optional): Verified sender email, e.g., "Sugar Mama <hello@yourdomain.com>"
+// 4. ZOHO_FROM_EMAIL: Authorized mailbox address, e.g., hello@sugarmamacookieco.com.au
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const ZOHO_REFRESH_TOKEN = Deno.env.get("ZOHO_REFRESH_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
+const ZOHO_FROM_EMAIL = Deno.env.get("ZOHO_FROM_EMAIL");
 
-const DEFAULT_SENDER_EMAIL = RESEND_FROM_EMAIL || "Sugar Mama Cookie Co <notifications@yourverifieddomain.com>"; // Fallback if RESEND_FROM_EMAIL is not set
+const DEFAULT_SENDER_EMAIL = ZOHO_FROM_EMAIL || "Sugar Mama Cookie Co <notifications@yourverifieddomain.com>"; // Fallback if ZOHO_FROM_EMAIL is not set
 
 // --- Helper Functions ---
 const formatCurrency = (amount: number, currency = 'AUD', locale = 'en-AU') => {
@@ -102,8 +103,8 @@ serve(async (req: Request) => {
   }
 
   // --- Environment Variable Checks ---
-  if (!RESEND_API_KEY || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error("Missing one or more required environment variables: RESEND_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY");
+  if (!ZOHO_REFRESH_TOKEN || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error("Missing one or more required environment variables: ZOHO_REFRESH_TOKEN, SUPABASE_URL, SUPABASE_ANON_KEY");
     return new Response(
       JSON.stringify({ error: "Service configuration error. Required environment variables are missing." }),
       { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
@@ -115,10 +116,10 @@ serve(async (req: Request) => {
     global: { headers: { Authorization: req.headers.get('Authorization')! } }
   });
 
-  if (!RESEND_API_KEY) { // This specific check is now redundant due to the combined check above, but kept for logical flow if separated later.
-    console.error("RESEND_API_KEY is not set in environment variables.");
+  if (!ZOHO_REFRESH_TOKEN) { // This specific check is now redundant due to the combined check above, but kept for logical flow if separated later.
+    console.error("ZOHO_REFRESH_TOKEN is not set in environment variables.");
     return new Response(
-      JSON.stringify({ error: "RESEND_API_KEY is not configured." }),
+      JSON.stringify({ error: "ZOHO_REFRESH_TOKEN is not configured." }),
       { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   }
@@ -210,31 +211,24 @@ serve(async (req: Request) => {
 
     console.log(`Attempting to send email to: ${recipientEmail} with subject: "${emailSubject}" from: ${senderEmail}`);
 
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${RESEND_API_KEY}`
-        },
-        body: JSON.stringify({
+    const mailResult = await mailResponse({
             from: senderEmail,
-            to: [recipientEmail], // Resend API expects 'to' to be an array
+            to: [recipientEmail], // Zoho Mail API expects 'to' to be an array
             subject: emailSubject,
             html: htmlContent,
-        })
-    });
+        });
 
-    const responseData = await resendResponse.json();
+    const responseData = await mailResult.json();
 
-    if (!resendResponse.ok) {
-      console.error("Resend API Error:", responseData);
+    if (!mailResult.ok) {
+      console.error("Zoho Mail API Error:", responseData);
       return new Response(
-        JSON.stringify({ error: "Failed to send email via Resend", details: responseData }),
-        { status: resendResponse.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        JSON.stringify({ error: "Failed to send email via Zoho Mail", details: responseData }),
+        { status: mailResult.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       );
     }
 
-    console.log("Email sent successfully via Resend:", responseData);
+    console.log("Email sent successfully via Zoho Mail:", responseData);
     return new Response(
       JSON.stringify({ message: "Email sent successfully", data: responseData }),
       { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
