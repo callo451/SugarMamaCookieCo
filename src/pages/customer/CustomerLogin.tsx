@@ -23,7 +23,7 @@ export default function CustomerLogin(){
  {(error||callbackError)&&<p className="customer-error" role="alert">{error||callbackError}</p>}{notice&&<p className="customer-notice" role="status">{notice}</p>}
  {callback&&loading?<p role="status">Finishing sign-in…</p>:<>
  {callback&&!user&&!loading&&<p role="status">If your sign-in link expired, sign in below or request a password reset.</p>}
- {!setting&&mode!=='reset'&&enabled.length>0&&<div className="customer-social">{enabled.map(p=><button key={p} disabled={busy} onClick={()=>social(p)}>Continue with {p[0].toUpperCase()+p.slice(1)}</button>)}<span>or use your email</span></div>}
+ {!setting&&mode!=='reset'&&enabled.length>0&&<div className="customer-social">{enabled.map(p=><button key={p} type="button" className={p==='google'?'customer-google-button':undefined} disabled={busy} onClick={()=>social(p)}>{p==='google'&&<img src="/branding/google-g.png" width="20" height="20" alt="" aria-hidden="true"/>}Continue with {p[0].toUpperCase()+p.slice(1)}</button>)}<span>or use your email</span></div>}
  <form onSubmit={submit}>
  {!setting&&<label>Email address<input type="email" autoComplete="username" required maxLength={254} value={email} onChange={e=>setEmail(e.target.value)}/></label>}
  {(setting||mode!=='reset')&&<label>Password<input type="password" autoComplete={setting||mode==='signup'?'new-password':'current-password'} required minLength={setting||mode==='signup'?12:undefined} value={password} onChange={e=>setPassword(e.target.value)}/></label>}

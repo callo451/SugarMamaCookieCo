@@ -6,3 +6,5 @@
 .customer-portal .quote-wizard h2{font-size:28px;margin:0}
 .customer-portal .quote-wizard label{margin-bottom:8px}
 .customer-portal .quote-wizard .bakery-kicker{font-size:11px;letter-spacing:2px;color:#36513c;font-weight:600}
+
+.customer-social .customer-google-button{display:flex;align-items:center;justify-content:center;gap:12px;min-height:44px;background:#fff;border:1px solid #747775;color:#1f1f1f;font-family:Arial,sans-serif;font-size:14px;font-weight:500;letter-spacing:.25px}.customer-google-button img{width:20px;height:20px;flex-shrink:0}.customer-social .customer-google-button:hover:not(:disabled){background:#f8faff}
