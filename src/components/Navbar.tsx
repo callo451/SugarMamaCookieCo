@@ -17,7 +17,6 @@ export default function Navbar() {
         <Link to="/#about">Meet Sugar Mama</Link>
         <Link to="/#contact">Contact</Link>
         <Link to="/account">My orders</Link>
-        <Link to="/privacy" aria-current={location.pathname === '/privacy' ? 'page' : undefined}>Privacy</Link>
         <Link to="/quote-builder" className="bakery-button">Get a cookie quote</Link>
       </nav>
     </div>

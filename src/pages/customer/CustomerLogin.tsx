@@ -32,6 +32,5 @@ export default function CustomerLogin(){
  {!setting&&<div className="customer-auth-links"><button onClick={()=>{setMode(mode==='reset'?'login':'reset');setError('');setNotice('');}}>{mode==='reset'?'Back to sign in':'Forgot your password?'}</button>{signupEnabled&&<button onClick={()=>{setMode(mode==='signup'?'login':'signup');setError('');setNotice('');}}>{mode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>}</div>}
  {setting&&!user&&!loading&&<Link to="/account/login">Return to sign in to request a new link</Link>}
  </>}
- <p className="customer-small">Read how we handle your information in our <Link to="/privacy">Privacy policy</Link>.</p>
  <p className="customer-small">Use the same email as your order to see previous quotes. If you use Apple’s Hide My Email, contact Faith to connect orders placed under another address.</p></div></main></div>;
 }
