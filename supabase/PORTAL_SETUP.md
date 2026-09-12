@@ -1,6 +1,6 @@
 # Portal activation
 
-Activated in the existing SugarMamaCookie project on 12 September 2026 (Melbourne): membership migration, Faith as Owner, Dean as Staff, signup disabled, recovery redirects, manage-team and push-dispatch functions, VAPID secrets, and the one-minute push cron. The migration is recorded as applied. Cron HTTP responses and the authenticated worker returned 200. The upgraded frontend currently runs locally; the public website has not been published from this checkout.
+Activated in the existing SugarMamaCookie project on 12 September 2026 (Melbourne): membership migration, Faith as Owner, Dean as Staff, signup initially disabled, recovery redirects, manage-team and push-dispatch functions, VAPID secrets, and the one-minute push cron. The migration is recorded as applied. Cron HTTP responses and the authenticated worker returned 200. The upgraded frontend currently runs locally; the public website has not been published from this checkout.
 
 Remaining rollout checks: publish the frontend with the public VAPID key, verify a real invitation/reset email, and verify push on an installed iPhone web app. No real test invitations were sent. The existing SMTP configuration was preserved. The instructions below document reproducible setup for another environment.
 
@@ -25,8 +25,10 @@ Do not replay old migrations against the live database without reviewing their c
 
 ## 3. Configure Supabase Auth
 
-- Disable **Allow new users to sign up** in Auth settings. Owner invitations use the server-side Admin API and remain available.
-- Keep email/password sign-in enabled. Do not enable Apple or other providers.
+The customer portal now shares Auth with the staff workspace. See `CUSTOMER_PORTAL_SETUP.md` for the current customer setup and OAuth providers. Staff access remains controlled by `portal_members`, not by whether registration is open.
+
+- Enable **Allow new users to sign up** and require email confirmation for the customer portal. For a staff-only deployment without the customer portal, signup may remain disabled. Owner invitations use the server-side Admin API.
+- Keep email/password sign-in enabled. Customer Apple, Google and Facebook sign-in can be enabled after completing their provider configuration; they do not grant staff membership.
 - Set Site URL to the final HTTPS frontend origin.
 - Add the exact `/admin/set-password` callback for the production origin and `http://127.0.0.1:5173/admin/set-password` for local testing to the redirect allow list.
 - Configure production SMTP and verify password reset/invitation delivery. Supabase's default mail service is limited and is not a production delivery plan.

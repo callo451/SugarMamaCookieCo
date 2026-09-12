@@ -19,6 +19,7 @@ import {
   Search,
   CalendarDays,
   ClipboardList,
+  MessageCircle,
 } from "lucide-react";
 import { stopDeviceNotifications } from "../lib/portal";
 import { supabase } from "../lib/supabase";
@@ -29,6 +30,7 @@ const navigation = [
   { label: "Production", to: "/admin/production", icon: ClipboardList },
   { label: "Collections", to: "/admin/calendar", icon: CalendarDays },
   { label: "Customers", to: "/admin/customers", icon: Users },
+  { label: "Messages", to: "/admin/messages", icon: MessageCircle },
   { label: "Activity", to: "/admin/activity", icon: Bell },
   { label: "Settings", to: "/admin/settings", icon: Settings },
 ];

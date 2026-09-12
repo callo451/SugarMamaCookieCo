@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import InspirationPhotos from '../../components/customer/InspirationPhotos';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -6,22 +7,19 @@ import {
   Loader2,
   Trash2,
   Mail,
-  User,
-  Cookie,
-  FileText,
-  DollarSign,
-  Calendar,
-  Clock,
   Download,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import OrderConversation from '../../components/customer/OrderConversation';
+import OrderInvoices from '../../components/customer/OrderInvoices';
 import { generateOrderPdf } from '../../utils/generateOrderPdf';
 
 interface Order {
   id: string;
   created_at: string;
   updated_at: string;
+  quote_priced: boolean;
   total_amount: number;
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   customer_name: string;
@@ -94,13 +92,10 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  useEffect(() => {
-    if (id) fetchOrder();
-  }, [id]);
-
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     setLoading(true);
     try {
       const [orderRes, itemsRes] = await Promise.all([
@@ -109,6 +104,7 @@ export default function OrderDetail() {
       ]);
 
       if (orderRes.error) throw orderRes.error;
+      if (itemsRes.error) throw itemsRes.error;
       setOrder(orderRes.data);
       setEditedOrder(orderRes.data);
       setItems(itemsRes.data || []);
@@ -119,7 +115,9 @@ export default function OrderDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => { if (id) void fetchOrder(); }, [id, fetchOrder]);
 
   const updateOrder = async (updates: Partial<Order>) => {
     if (!order) return;
@@ -149,10 +147,10 @@ export default function OrderDetail() {
     });
   };
 
-  const handleBlur = (fieldName: string) => {
+  const handleBlur = (fieldName: keyof Order) => {
     if (!editedOrder || !order) return;
-    const oldVal = (order as any)[fieldName];
-    const newVal = (editedOrder as any)[fieldName];
+    const oldVal = order[fieldName];
+    const newVal = editedOrder[fieldName];
     if (oldVal !== newVal) {
       updateOrder({ [fieldName]: newVal });
     }
@@ -227,303 +225,54 @@ export default function OrderDetail() {
 
   if (!editedOrder || !order) return null;
 
-  const statusConfig = STATUS_OPTIONS.find((s) => s.value === editedOrder.status) || STATUS_OPTIONS[0];
   const orderId = order.display_order_id || order.id.slice(0, 8);
 
+  const field = (name: keyof Order, label: string, type = 'text') => <label className="order-field" htmlFor={`order-${name}`}><span>{label}</span><input id={`order-${name}`} name={name} type={type} value={String(editedOrder[name] ?? '')} onChange={handleInputChange} onBlur={() => handleBlur(name)} min={name === 'quantity' ? 1 : type === 'number' ? 0 : undefined} step={name === 'total_amount' ? '0.01' : undefined}/></label>;
+  const notes = (name: 'description' | 'special_fonts' | 'special_instructions', label: string, rows = 3) => <label className="order-field" htmlFor={`order-${name}`}><span>{label}</span><textarea id={`order-${name}`} name={name} value={editedOrder[name] || ''} onChange={handleInputChange} onBlur={() => handleBlur(name)} rows={rows}/></label>;
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-      {/* Top bar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/admin/orders')}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Order #{orderId}</h1>
-            <p className="text-sm text-gray-500">{dateFormat.format(new Date(order.created_at))}</p>
-          </div>
+    <motion.div className="order-detail-page" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+      <button className="order-back" onClick={() => navigate('/admin/orders')}><ArrowLeft size={16}/>All orders</button>
+      <header className="page-heading order-heading">
+        <div><p className="eyebrow">THE ORDER BOOK</p><h1>Order #{orderId}</h1><p className="muted">{order.customer_name} · {order.quantity} cookies</p></div>
+        <div className="order-actions">
+          <button className="studio-button secondary" disabled={sendingEmail || saving} onClick={handleResendEmail}>{sendingEmail ? <Loader2 size={16} className="animate-spin"/> : <Mail size={16}/>} {sendingEmail ? 'Sending…' : 'Resend confirmation'}</button>
+          <button className="studio-button" disabled={exportingPdf || saving} onClick={async () => {
+            setExportingPdf(true);
+            try { await generateOrderPdf(order, items); }
+            catch (error) { toast.error(error instanceof Error ? error.message : 'Could not export PDF. Please try again.'); }
+            finally { setExportingPdf(false); }
+          }}>{exportingPdf ? <Loader2 size={16} className="animate-spin"/> : <Download size={16}/>} {exportingPdf ? 'Preparing PDF…' : 'Export PDF'}</button>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status dropdown */}
-          <select
-            value={editedOrder.status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium ring-1 ring-inset border-0 cursor-pointer ${statusConfig.className}`}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => generateOrderPdf(order, items)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export PDF</span>
-            <span className="sm:hidden">PDF</span>
-          </button>
-
-          <button
-            onClick={handleResendEmail}
-            disabled={sendingEmail}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
-          >
-            {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            <span className="hidden sm:inline">Resend Email</span>
-            <span className="sm:hidden">Email</span>
-          </button>
-
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 sm:py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-          >
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Delete
-          </button>
-
-          {saving && (
-            <span className="flex items-center gap-1 text-xs text-sage-600">
-              <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-            </span>
-          )}
+      </header>
+      <div className="order-save-note" role="status">{saving ? <><Loader2 size={14} className="animate-spin"/>Saving changes…</> : 'Changes save when you leave a field.'}</div>
+      <div className="order-detail-grid">
+        <div className="order-main">
+          <section className="studio-panel order-panel"><header><p className="eyebrow">01 / CUSTOMER</p><h2>Who we’re baking for</h2></header><div className="order-fields order-contact">{field('customer_name','Name')}{field('customer_email','Email','email')}{field('customer_phone','Phone','tel')}</div></section>
+          <section className="studio-panel order-panel"><header><p className="eyebrow">02 / THE COOKIES</p><h2>Design & details</h2></header><div className="order-fields">
+            {notes('description','Design brief',4)}
+            <div className="order-three-fields">
+              <label className="order-field" htmlFor="order-category"><span>Occasion</span><select id="order-category" name="category" value={editedOrder.category || ''} onChange={e => {handleInputChange(e); void updateOrder({category:e.target.value});}}>{CATEGORY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></label>
+              <label className="order-field" htmlFor="order-shape"><span>Shape</span><select id="order-shape" name="shape" value={editedOrder.shape || ''} onChange={e => {handleInputChange(e); void updateOrder({shape:e.target.value});}}>{SHAPE_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></label>
+              {field('quantity','Quantity','number')}
+            </div>
+            {notes('special_fonts','Text & fonts',2)}{notes('special_instructions','Special instructions')}
+          </div></section>
+          <div className="customer-portal customer-admin order-attachments"><InspirationPhotos key={`photos-${order.id}`} orderId={order.id}/><OrderConversation key={order.id} orderId={order.id}/><OrderInvoices key={`invoices-${order.id}`} orderId={order.id} staff/></div>
         </div>
-      </div>
-
-      {/* Content grid */}
-      <section className="studio-panel p-5 mb-6"><label htmlFor="collection_date" className="block text-sm font-medium mb-2">Collection date</label><input id="collection_date" name="collection_date" type="date" value={editedOrder.collection_date || ''} onChange={handleInputChange} onBlur={() => handleBlur('collection_date')} disabled={saving} className="rounded border-gray-300"/><p className="text-xs text-gray-500 mt-2">Used in your upcoming collections schedule.</p></section>
-<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left column */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Customer Info */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
-              <User className="h-4 w-4 text-sage-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Customer Information</h2>
-            </div>
-            <div className="grid gap-4 p-4 sm:p-5 sm:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Name</label>
-                <input
-                  type="text"
-                  name="customer_name"
-                  value={editedOrder.customer_name}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('customer_name')}
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Email</label>
-                <input
-                  type="email"
-                  name="customer_email"
-                  value={editedOrder.customer_email}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('customer_email')}
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Phone</label>
-                <input
-                  type="tel"
-                  name="customer_phone"
-                  value={editedOrder.customer_phone || ''}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('customer_phone')}
-                  placeholder="—"
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Cookie Details */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
-              <Cookie className="h-4 w-4 text-sage-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Cookie Details</h2>
-            </div>
-            <div className="space-y-4 p-4 sm:p-5">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Description</label>
-                <textarea
-                  name="description"
-                  value={editedOrder.description || ''}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('description')}
-                  rows={3}
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Category</label>
-                  <select
-                    name="category"
-                    value={editedOrder.category || ''}
-                    onChange={(e) => {
-                      handleInputChange(e);
-                      updateOrder({ category: e.target.value });
-                    }}
-                    className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                  >
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Shape</label>
-                  <select
-                    name="shape"
-                    value={editedOrder.shape || ''}
-                    onChange={(e) => {
-                      handleInputChange(e);
-                      updateOrder({ shape: e.target.value });
-                    }}
-                    className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                  >
-                    {SHAPE_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-500">Quantity</label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={editedOrder.quantity}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('quantity')}
-                    min="1"
-                    className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Special Requests */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
-              <FileText className="h-4 w-4 text-sage-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Special Requests</h2>
-            </div>
-            <div className="space-y-4 p-4 sm:p-5">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Text & Fonts</label>
-                <textarea
-                  name="special_fonts"
-                  value={editedOrder.special_fonts || ''}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('special_fonts')}
-                  rows={2}
-                  placeholder="No text specified"
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Special Instructions</label>
-                <textarea
-                  name="special_instructions"
-                  value={editedOrder.special_instructions || ''}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('special_instructions')}
-                  rows={3}
-                  placeholder="No special instructions"
-                  className="w-full rounded-lg border-gray-200 text-sm focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-6">
-          {/* Pricing */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
-              <DollarSign className="h-4 w-4 text-sage-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Pricing</h2>
-            </div>
-            <div className="p-4 sm:p-5">
-              <div className="mb-4">
-                <label className="mb-1 block text-xs font-medium text-gray-500">Total Amount</label>
-                <input
-                  type="number"
-                  name="total_amount"
-                  value={editedOrder.total_amount}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('total_amount')}
-                  step="0.01"
-                  min="0"
-                  className="w-full rounded-lg border-gray-200 text-lg font-semibold text-gray-900 focus:border-sage-500 focus:ring-sage-500"
-                />
-              </div>
-
-              {editedOrder.quantity > 0 && (
-                <p className="mb-4 text-sm text-gray-500">
-                  {editedOrder.quantity} cookies &times; {currencyFormat.format(editedOrder.total_amount / editedOrder.quantity)} each
-                </p>
-              )}
-
-              {items.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-medium text-gray-500">Order Items</p>
-                  <div className="space-y-2">
-                    {items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{item.description}</p>
-                          <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
-                        </div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {currencyFormat.format(item.unit_price * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Timeline */}
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 px-4 sm:px-5 py-3">
-              <Calendar className="h-4 w-4 text-sage-500" />
-              <h2 className="text-sm font-semibold text-gray-900">Timeline</h2>
-            </div>
-            <div className="space-y-4 p-4 sm:p-5">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-50">
-                  <Calendar className="h-3 w-3 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Created</p>
-                  <p className="text-xs text-gray-500">{dateFormat.format(new Date(order.created_at))}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50">
-                  <Clock className="h-3 w-3 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Last Updated</p>
-                  <p className="text-xs text-gray-500">{dateFormat.format(new Date(order.updated_at))}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <aside className="order-sidebar">
+          <section className="studio-panel order-panel"><header><p className="eyebrow">IN THE KITCHEN</p><h2>Progress & collection</h2></header><div className="order-fields">
+            <label className="order-field" htmlFor="order-status"><span>Order status</span><select id="order-status" value={editedOrder.status} disabled={saving} onChange={e => handleStatusChange(e.target.value)}>{STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
+            {field('collection_date','Collection date','date')}<p className="order-help">This date appears on your production board and collection calendar.</p>
+          </div></section>
+          <section className="studio-panel order-panel order-pricing"><header><p className="eyebrow">THE QUOTE</p><h2>Pricing</h2></header><div className="order-fields">
+            {field('total_amount','Total (AUD)','number')}
+            {editedOrder.quantity > 0 && <p className="order-help">{editedOrder.quantity} cookies × {currencyFormat.format(editedOrder.total_amount / editedOrder.quantity)} each</p>}
+            {items.length > 0 && <ul className="order-items">{items.map(item => <li key={item.id}><div>{item.description}<small>Quantity: {item.quantity}</small></div><strong>{currencyFormat.format(item.unit_price * item.quantity)}</strong></li>)}</ul>}
+            <p className="order-help">This total is visible to the customer in their account and PDF.</p>
+          </div></section>
+          <section className="order-record"><h2>Order record</h2><dl><div><dt>Created</dt><dd>{dateFormat.format(new Date(order.created_at))}</dd></div><div><dt>Last updated</dt><dd>{dateFormat.format(new Date(order.updated_at))}</dd></div></dl></section>
+          <div className="order-delete"><button disabled={deleting || saving} onClick={handleDelete}>{deleting ? <Loader2 size={15} className="animate-spin"/> : <Trash2 size={15}/>} {deleting ? 'Deleting…' : 'Delete order'}</button><p>Permanently remove this order.</p></div>
+        </aside>
       </div>
     </motion.div>
   );

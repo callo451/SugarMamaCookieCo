@@ -40,8 +40,10 @@ const date = (value: string) => {
 };
 const statuses: Record<string, string> = {pending:'Awaiting confirmation',confirmed:'Confirmed',in_progress:'In the making',completed:'Completed',cancelled:'Cancelled'};
 
+export interface PdfInspirationPhoto { data: Uint8Array; name: string; }
+
 /** Build separately from download so pagination can be checked with sample data. */
-export function buildOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = []): jsPDF {
+export function buildOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = [], photos: PdfInspirationPhoto[] = []): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const quote = order.status === 'pending';
   const kind = quote ? 'Quote' : 'Order';
@@ -102,6 +104,20 @@ export function buildOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = [])
   y+=12;text(quote?'QUOTE TOTAL (AUD)':'ORDER TOTAL (AUD)',10,'#ffffff',true,26);
   doc.setFontSize(18);doc.text(money(order.total_amount),184,y,{align:'right'});y+=16;
   paragraph(quote ? 'This quote is subject to confirmation of design, availability and final price. Your booking is confirmed separately.' : order.status === 'cancelled' ? 'This order is cancelled. Contact us if you have any questions.' : 'Thank you for choosing Sugar Mama. Contact us to confirm collection or delivery arrangements.');
+  for (const [index, photo] of photos.entries()) {
+    doc.addPage(); header(false);
+    doc.setFont('times', 'normal'); doc.setFontSize(26); doc.setTextColor(INK);
+    doc.text('Design inspiration', 20, y); y += 10;
+    paragraph('Customer-supplied reference. Faith will confirm the final cookie design.');
+    text(`${photo.name}  |  ${index + 1} of ${photos.length}`, 9, MUTED);
+    y += 8;
+    const boxHeight = 252 - y;
+    const props = doc.getImageProperties(photo.data);
+    const scale = Math.min(166 / props.width, (boxHeight - 4) / props.height);
+    const width = props.width * scale, height = props.height * scale;
+    doc.setFillColor(PAPER); doc.rect(20, y, 170, boxHeight, 'F');
+    doc.addImage(photo.data, 'JPEG', 20 + (170 - width) / 2, y + (boxHeight - height) / 2, width, height);
+  }
   const pages=doc.getNumberOfPages();
   for(let page=1;page<=pages;page++){
     doc.setPage(page);doc.setDrawColor('#cfd2c3');doc.line(20,276,190,276);
@@ -110,8 +126,10 @@ export function buildOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = [])
   }
   return doc;
 }
-export function generateOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = []): void {
+export async function generateOrderPdf(order: OrderForPdf, items: OrderItemForPdf[] = []): Promise<void> {
+ const { loadPdfInspirationPhotos } = await import('../lib/pdfInspirationPhotos');
+ const photos = await loadPdfInspirationPhotos(order.id);
  const reference=(order.display_order_id || order.id.slice(0,8)).replace(/[^a-zA-Z0-9_-]/g,'_');
  const name=order.customer_name.replace(/[^a-zA-Z0-9_-]/g,'_');
- buildOrderPdf(order,items).save(`${order.status === 'pending' ? 'Quote' : 'Order'}-${reference}-${name}.pdf`);
+ buildOrderPdf(order,items,photos).save(`${order.status === 'pending' ? 'Quote' : 'Order'}-${reference}-${name}.pdf`);
 }

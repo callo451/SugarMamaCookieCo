@@ -25,5 +25,9 @@ verify_jwt = false
 verify_jwt = false
 
 [auth]
-enable_signup = false
-additional_redirect_urls = ["http://127.0.0.1:5173/admin/set-password", "http://localhost:5173/admin/set-password", "https://sugarmamacookieco.com.au/admin/set-password", "https://www.sugarmamacookieco.com.au/admin/set-password", "http://127.0.0.1:5173/auth/set-password", "http://localhost:5173/auth/set-password", "https://sugarmamacookieco.com.au/auth/set-password", "https://www.sugarmamacookieco.com.au/auth/set-password"]
+site_url = "https://sugarmamacookieco.com.au"
+enable_signup = true
+additional_redirect_urls = ["http://127.0.0.1:5173/admin/set-password", "http://localhost:5173/admin/set-password", "https://sugarmamacookieco.com.au/admin/set-password", "https://www.sugarmamacookieco.com.au/admin/set-password", "http://127.0.0.1:5173/auth/set-password", "http://localhost:5173/auth/set-password", "https://sugarmamacookieco.com.au/auth/set-password", "https://www.sugarmamacookieco.com.au/auth/set-password", "http://127.0.0.1:5173/account/callback", "http://127.0.0.1:5173/account/set-password", "http://localhost:5173/account/callback", "http://localhost:5173/account/set-password", "https://sugarmamacookieco.com.au/account/callback", "https://sugarmamacookieco.com.au/account/set-password", "https://www.sugarmamacookieco.com.au/account/callback", "https://www.sugarmamacookieco.com.au/account/set-password"]
+
+[auth.email]
+enable_confirmations = true

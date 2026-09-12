@@ -19,6 +19,13 @@ import Customers from './pages/admin/Customers';
 import AdminSettings from './pages/admin/Settings';
 import OrderDetail from './pages/admin/OrderDetail';
 import './bakery.css';
+import './customer.css';
+import CustomerLogin from './pages/customer/CustomerLogin';
+import CustomerLayout from './pages/customer/CustomerLayout';
+import CustomerHome from './pages/customer/CustomerHome';
+import CustomerOrderDetail from './pages/customer/CustomerOrderDetail';
+import RequestQuote from './pages/customer/RequestQuote';
+import CustomerInbox from './pages/admin/CustomerInbox';
 import { Toaster } from 'react-hot-toast';
 
 function PublicLayout() {
@@ -55,6 +62,7 @@ function App() {
             <Route path="orders/:id" element={<OrderDetail />} />
             <Route path="users" element={<Users />} />
             <Route path="activity" element={<Activity />} />
+            <Route path="messages" element={<CustomerInbox />} />
             <Route path="production" element={<Production />} />
             <Route path="calendar" element={<Production calendar />} />
             <Route path="customers" element={<Customers />} />
@@ -65,6 +73,14 @@ function App() {
           <Route path="/admin/login" element={<Login />} />
           <Route path="/admin/set-password" element={<Login />} />
           <Route path="/auth/set-password" element={<Login />} />
+          <Route path="/account/login" element={<CustomerLogin />} />
+          <Route path="/account/callback" element={<CustomerLogin />} />
+          <Route path="/account/set-password" element={<CustomerLogin />} />
+          <Route path="/account" element={<CustomerLayout />}>
+            <Route index element={<CustomerHome />} />
+            <Route path="quote" element={<RequestQuote />} />
+            <Route path="orders/:id" element={<CustomerOrderDetail />} />
+          </Route>
           {/* Public routes with Navbar/Footer */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
