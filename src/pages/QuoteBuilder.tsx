@@ -261,76 +261,12 @@ export default function QuoteBuilder({ embedded = false }: { embedded?: boolean 
         return;
       }
       if (embedded) throw new Error('Your session expired. Please sign in again before sending your quote.');
-      const latestTotalPrice = calculatePrice(formData.quantity);
-
-      const { error: orderError } = await supabase.from('orders').insert([
-        {
-          id: requestId,
-          inspiration_upload_token: uploadToken,
-          total_amount: latestTotalPrice,
-          status: 'pending',
-          customer_name: formData.customerName,
-          customer_email: formData.customerEmail.trim(),
-          customer_phone: formData.customerPhone,
-          quantity: formData.quantity,
-          description: formData.description,
-          category: formData.category,
-          shape: formData.shape,
-          special_fonts: formData.specialFonts,
-          special_instructions: formData.specialInstructions,
-          collection_date: formData.collectionDate || null,
-        },
-      ]);
-
-      if (orderError) throw orderError;
+      const { error } = await supabase.rpc('request_guest_quote', {request: {
+        ...customerQuoteRequest(formData, requestId), email: formData.customerEmail.trim(), inspiration_upload_token: uploadToken,
+      }});
+      if (error) throw error;
       setSavedQuote({id:requestId,account:false});
-
-      const now = new Date().toISOString();
-      const unitPrice = calculateUnitPrice(formData.quantity);
-
-      // Admin alert (non-blocking)
-      supabase.functions
-        .invoke('send-admin-new-order-alert', {
-          body: {
-            orderData: {
-              order_number: 'Pending',
-              customer_name: formData.customerName,
-              customer_email: formData.customerEmail,
-              customer_phone: formData.customerPhone,
-              created_at: now,
-              total_amount: latestTotalPrice,
-              delivery_option: 'N/A - Quote Builder',
-              notes: formData.specialInstructions || 'No special instructions provided.',
-              items: [{ product_name: formData.description, quantity: formData.quantity, unit_price: unitPrice }],
-            },
-          },
-        })
-        .catch((e) => console.error('Admin alert error:', e));
-
-      // Customer confirmation (non-blocking)
-      supabase.functions
-        .invoke('send-order-notification', {
-          body: {
-            orderData: {
-              order_number: 'Pending',
-              customer_name: formData.customerName,
-              customer_email: formData.customerEmail,
-              customer_phone: formData.customerPhone,
-              created_at: now,
-              total_amount: latestTotalPrice,
-              items: [
-                {
-                  product_name: formData.description,
-                  quantity: formData.quantity,
-                  unit_price: unitPrice,
-                  total_price: latestTotalPrice,
-                },
-              ],
-            },
-          },
-        })
-        .catch((e) => console.error('Customer email error:', e));
-
+      // Database queues confirmation and bakery alert only after the quote is saved.
       await finishQuote(requestId,false);
     } catch (error) {
       console.error('Error submitting quote:', error);

@@ -1,3 +1,5 @@
+import { dispatchOrderEmails } from './order-emails.ts';
+import { dispatchMessageEmails } from './message-emails.ts';
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import webpush from "npm:web-push@3.6.7";
 const admin = createClient(
@@ -35,6 +37,8 @@ Deno.serve(async (req) => {
     req.headers.get("x-dispatch-secret") !== secret
   )
     return new Response("Unauthorized", { status: 401 });
+  const emailResult = await dispatchMessageEmails(admin);
+  const orderEmailResult = await dispatchOrderEmails(admin);
   const publicKey = Deno.env.get("VAPID_PUBLIC_KEY"),
     privateKey = Deno.env.get("VAPID_PRIVATE_KEY"),
     subject = Deno.env.get("VAPID_SUBJECT");
@@ -43,7 +47,7 @@ Deno.serve(async (req) => {
   webpush.setVapidDetails(subject, publicKey, privateKey);
   const { data: jobs, error } = await admin.rpc("claim_portal_push_jobs");
   if (error) return new Response("Could not claim jobs", { status: 500 });
-  let failed = 0;
+  let failed = emailResult.failed + orderEmailResult.failed;
   for (const event of jobs || []) {
     let success = true;
     const { data: subscriptions, error: subError } = await admin
@@ -58,7 +62,7 @@ Deno.serve(async (req) => {
       continue;
     }
     for (const sub of subscriptions || []) {
-      if (event.kind === "new_order" ? !sub.new_orders : !sub.order_updates)
+      if (event.kind === "customer_message" ? !sub.customer_messages : event.kind === "new_order" ? !sub.new_orders : !sub.order_updates)
         continue;
       if (!validEndpoint(sub.endpoint)) {
         await admin.from("portal_push_subscriptions").delete().eq("id", sub.id);
@@ -96,7 +100,7 @@ Deno.serve(async (req) => {
             body: event.body,
             tag: `order-event-${event.id}`,
             url: event.order_id
-              ? `/admin/orders/${event.order_id}`
+              ? `/admin/orders/${event.order_id}${event.kind === "customer_message" ? "#conversation" : ""}`
               : "/admin/activity",
           }),
           { TTL: 3600, timeout: 10000 },
@@ -106,7 +110,7 @@ Deno.serve(async (req) => {
           .insert({ event_id: event.id, subscription_id: sub.id });
         if (recordError) success = false;
       } catch (e) {
-        if (e.statusCode === 404 || e.statusCode === 410)
+        if (typeof e === 'object' && e !== null && 'statusCode' in e && (e.statusCode === 404 || e.statusCode === 410))
           await admin
             .from("portal_push_subscriptions")
             .delete()
@@ -121,7 +125,7 @@ Deno.serve(async (req) => {
     if (!success || finishError) failed++;
   }
   return new Response(
-    JSON.stringify({ processed: jobs?.length || 0, failed }),
+    JSON.stringify({ processed: jobs?.length || 0, emails: emailResult, failed }),
     {
       headers: { "Content-Type": "application/json" },
       status: failed ? 207 : 200,

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { transformWithEsbuild } from 'vite';
-const {code}=await transformWithEsbuild(await readFile(new URL('../src/lib/production.ts',import.meta.url),'utf8'),'production.ts',{loader:'ts',format:'esm'});
+import { transformWithOxc } from 'vite';
+const {code}=await transformWithOxc(await readFile(new URL('../src/lib/production.ts',import.meta.url),'utf8'),'production.ts',{loader:'ts',format:'esm'});
 const {businessToday,addDays,monday,productionGroups,cookieCount}=await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 test('Melbourne day is correct across UTC midnight and daylight saving',()=>{
  assert.equal(businessToday(new Date('2026-09-11T15:00:00Z')),'2026-09-12');

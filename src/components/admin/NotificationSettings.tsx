@@ -12,6 +12,7 @@ export default function NotificationSettings() {
   const [message, setMessage] = useState("");
   const [newOrders, setNewOrders] = useState(true);
   const [updates, setUpdates] = useState(true);
+  const [customerMessages, setCustomerMessages] = useState(true);
   const supported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -39,7 +40,7 @@ export default function NotificationSettings() {
         if (sub) {
           const { data, error } = await supabase
             .from("portal_push_subscriptions")
-            .select("new_orders,order_updates")
+            .select("new_orders,order_updates,customer_messages")
             .eq("endpoint", sub.endpoint)
             .eq("user_id", user.id)
             .maybeSingle();
@@ -48,6 +49,7 @@ export default function NotificationSettings() {
             setRegistered(true);
             setNewOrders(data.new_orders);
             setUpdates(data.order_updates);
+            setCustomerMessages(data.customer_messages);
           }
         }
       } catch {
@@ -98,6 +100,7 @@ export default function NotificationSettings() {
             auth: json.keys?.auth,
             new_orders: newOrders,
             order_updates: updates,
+            customer_messages: customerMessages,
           },
           { onConflict: "endpoint" },
         );
@@ -123,7 +126,7 @@ export default function NotificationSettings() {
     setMessage("");
     const { error } = await supabase
       .from("portal_push_subscriptions")
-      .update({ new_orders: newOrders, order_updates: updates })
+      .update({ new_orders: newOrders, order_updates: updates, customer_messages: customerMessages })
       .eq("endpoint", subscription.endpoint)
       .eq("user_id", user.id);
     if (error) setError("Could not save preferences.");
@@ -155,7 +158,7 @@ export default function NotificationSettings() {
     <section className="settings-section">
       <h2>Stay in the loop.</h2>
       <p className="muted">
-        Receive an alert when an order comes in or changes. Settings apply to
+        Receive an alert when an order comes in, changes, or a customer sends a message. Settings apply to
         this device. You can always find updates in Activity.
       </p>
       {ios && !standalone && (
@@ -202,6 +205,7 @@ export default function NotificationSettings() {
           onChange={(e) => setUpdates(e.target.checked)}
         />
       </div>
+      <div className="settings-row"><div><p>Customer messages</p><small>New messages and replies from customers. Email alerts also go to the bakery inbox.</small></div><input aria-label="Notify me about customer messages" type="checkbox" checked={customerMessages} onChange={e=>setCustomerMessages(e.target.checked)}/></div>
       <div className="settings-row">
         <div>
           <p>This device</p>

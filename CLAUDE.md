@@ -21,13 +21,13 @@ Tests use Node's test runner, PGlite for database/RLS checks, and mocked transpo
 
 ## Tech Stack
 
-React 18 + TypeScript + Vite 5 + Tailwind CSS 3 + Supabase (Postgres, Auth, Storage, Edge Functions). Zustand manages the cart. Framer Motion handles animations, react-hot-toast feedback, lucide-react icons, and jsPDF branded quote/order exports. Styling combines Tailwind utilities with scoped brand stylesheets.
+React 18 + TypeScript + Vite 8 + Tailwind CSS 3 + Supabase (Postgres, Auth, Storage, Edge Functions). Zustand manages the cart. Framer Motion handles animations, react-hot-toast feedback, lucide-react icons, and jsPDF branded quote/order exports. Styling combines Tailwind utilities with scoped brand stylesheets.
 
 ## Architecture
 
 ### Routing (src/App.tsx)
 
-- Public routes: `/` (Home), `/gallery`, `/quote-builder`, `/cart`, `/checkout`, `/privacy`.
+- Public routes: `/` (Home), `/gallery`, `/quote-builder`, `/cart`, `/privacy` (`/checkout` redirects to `/quote-builder`; card-entry checkout was removed).
 - Staff authentication: `/login`, `/admin/login`, `/admin/set-password`, `/auth/set-password`.
 - Admin routes share `<ProtectedRoute>` and `<AdminLayout>`: `/admin` (overview), `/admin/orders`, `/admin/orders/:id`, `/admin/users`, `/admin/activity`, `/admin/messages`, `/admin/production`, `/admin/calendar`, `/admin/customers`, `/admin/settings`.
 - Customer authentication: `/account/login`, `/account/callback`, `/account/set-password`.
@@ -43,17 +43,17 @@ One browser client, `supabase`, uses the public anon key and the current user's 
 ### Data Flow
 
 - **Shared quote flow:** `QuoteBuilder.tsx` implements Event → Design → Details → Contact on both `/quote-builder` and `/account/quote`; `RequestQuote.tsx` embeds it. Validation and request mapping live in `src/lib/quoteWizard.ts`. Keep both entry points consistent.
-- **Guest submission:** Creates a pending order, then offers optional account creation/sign-in using the order email. Existing notification functions handle guest quote emails. An account is not required to request a quote.
+- **Guest submission:** Calls `request_guest_quote`, which validates input and server pricing, fixes identity/status, preserves a stable request ID/upload capability, and enforces 3 requests per email/day plus 20 guest requests/hour and 100/day globally. After saving, the builder offers optional account creation/sign-in. A compatibility INSERT trigger protects older deployed clients until direct anonymous writes are revoked in the final security migration.
 - **Customer submission:** Calls `request_customer_quote` with a stable request ID. The RPC verifies email, stamps identity, validates input, enforces a daily limit, and returns the same order on retry. It never trusts supplied ownership, price or status.
 - **Order linking:** `claim_customer_orders` links unowned historical orders by verified Auth email. Existing ownership takes precedence. Directory email grouping does not grant access. Apple relay addresses may need manual identity verification before linking older orders; there is no automatic reassignment UI.
 - **Pricing:** `pricing_settings` provides base price and 12+, 24+, 50+ discount tiers. Unit price rounds to two decimals before multiplication. The `price_submitted_quote` insert trigger calculates customer quote totals server-side using `private.quote_total`, including signed-in and guest submissions, and publishes immediately. Quotes appear with their total and downloadable PDF; there is no manual publish/withdraw workflow. Staff can edit the total directly. `quote_priced` remains in the schema for compatibility. Builder/OrderModal have fallback pricing; keep their formulas aligned with the server.
 - **Inspiration photos:** Design step accepts up to three JPG/PNG/WebP files, each up to 10 MB before resizing. `quotePhotos.ts` converts to JPEG, limits the longest edge to 1600 pixels and output to 2 MB. Uploads follow confirmed order creation; failed uploads retry the same order and slots without creating another quote. Pending local photos are lost on page reload.
 - **Photo access:** Private paths are `order-id/upload-token/1.jpg` through `3.jpg`. Guest writes require a random capability valid for 24 hours; guests cannot read/list photos. Verified owning customers and staff can view them. `InspirationPhotos` is shared by customer/admin order details.
 - **PDFs:** `src/utils/generateOrderPdf.ts` builds branded quote/order documents. Downloads load private photos via `src/lib/pdfInspirationPhotos.ts` and append one uncropped reference per branded Design inspiration page. Failures stop export rather than silently omit photos. Invoice uploads are separate issued PDFs, not generated tax invoices or payment receipts.
-- **Customer communication:** `OrderConversation` shares private order messages between customer and bakery. Messages poll every 15 seconds and do not send email. Admin `/admin/messages` provides an inbox. Conversations show the latest 200 messages; inbox loads the latest 500.
+- **Customer communication:** `OrderConversation` shares private order messages between customer and bakery. Messages poll every 15 seconds. Customer messages/replies create activity, device push and a separate retryable email job to the bakery inbox; bakery replies do not notify the bakery or email the customer. Admin `/admin/messages` provides an inbox. Conversations show the latest 200 messages; inbox loads the latest 500.
 - **Customer directory:** `/admin/customers` combines paginated orders with the bakery-only `customer_directory_accounts` RPC. Includes accounts without orders, verified/unverified status, guest customers, quote/order counts and completed-order value. `src/lib/customerDirectory.ts` groups by persisted ownership first, otherwise verified normalized email. Unverified accounts are not merged with guest history. Team membership records exclude logins from portal customer counts; team accounts with orders remain labelled in the directory. Pending quotes and cancelled orders are excluded from completed-order value, which is not proof of payment.
 - **Production:** `/admin/production` and `/admin/calendar` use collection dates in Melbourne time. Completed/cancelled orders leave the active schedule. The branded print kitchen sheet uses the same typography and colours as the site and PDFs.
-- **Notifications:** Order inserts and meaningful updates create transactional events and durable push jobs. A one-minute cron invokes `push-dispatch`, with leases, retries and delivery receipts. Delivery is at-least-once, not guaranteed instant. On supported iOS, install the HTTPS admin portal to the Home Screen and enable notifications in Settings. Real-device delivery requires separate testing.
+- **Notifications:** Order inserts and meaningful updates create transactional events and durable push jobs. A one-minute cron invokes `push-dispatch`, with leases, retries and delivery receipts. The same worker independently processes `private.portal_message_email_jobs` through Zoho; device message preferences use `customer_messages`. Email delivery is at-least-once, so an ambiguous provider response may cause a duplicate. Delivery is at-least-once, not guaranteed instant. On supported iOS, install the HTTPS admin portal to the Home Screen and enable notifications in Settings. Real-device delivery requires separate testing.
 - **Privacy:** `src/pages/Privacy.tsx` provides the public policy, linked from the public footer. Update it when providers or data practices change.
 - **Data fetching:** Direct hooks with loading/error state; no React Query or SWR. Customer directory explicitly pages past the API row limit. Customer home has a 200-order limit and displays that limitation.
 
@@ -61,7 +61,7 @@ One browser client, `supabase`, uses the public anon key and the current user's 
 
 - `orders` — primary business table; pending/confirmed/in_progress/completed/cancelled, display reference such as QU001, collection date, customer ownership, idempotency request ID, price and inspiration upload token.
 - `order_items` — line items per order.
-- `products` — product catalogue used by the legacy cart/checkout flow.
+- `products` — product catalogue used by the legacy cart.
 - `pricing_settings` — base_price, discount_12, discount_24, discount_50.
 - `auth.users` — login identities. Not directly exposed to browser queries; the staff-only directory RPC returns limited account fields.
 - `portal_members` — owner/staff role and active flag; controls bakery access independently of public registration.
@@ -84,9 +84,9 @@ Deno runtime. Transactional mail uses the server-only Zoho Mail API transport in
 - `auth-email` — signed Supabase Send Email Hook for signup, invitation and password recovery; preserves Supabase verification tokens/callbacks.
 - `manage-team` — validates the caller's session and active owner membership before inviting/revoking staff.
 - `push-dispatch` — authenticated worker for queued Web Push deliveries.
-- `send-order-notification` — customer order confirmation using the existing HTML template/placeholders.
+- `send-order-notification` — customer order confirmation from the saved database order, requiring active staff access and an atomic resend quota. All customer substitutions are HTML-escaped; confirmed orders preserve the staff-managed confirmation template.
 - `send-admin-new-order-alert` / `send-admin-reminder` — bakery alerts/reminders.
-- `send-contact-email`, `send-contact-message`, `handle-contact-form` — contact processing and mail adapters.
+- `send-contact-message` — validated and throttled public contact email (3/email/day, 30 globally/hour); `send-contact-email` and `handle-contact-form` are retired and return 410.
 
 Review function-specific authentication before deployment. Disabling the gateway JWT check does not make an endpoint unrestricted: Auth hooks use signatures, team management validates sessions, and the push worker requires its secret. Never log tokens or commit mail credentials.
 
@@ -140,3 +140,16 @@ PUSH_DISPATCH_SECRET
 ```
 
 Hosted functions also use Supabase-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY` and, where privileged operations require it, `SUPABASE_SERVICE_ROLE_KEY`. OAuth provider credentials belong in Supabase Auth/provider configuration, not Vite or Git. Keep cron credentials in Vault. Local `supabase/config.toml` is partial: do not blanket-push it over live Auth settings or overwrite the configured Zoho email hook.
+
+
+### Security hardening (12 September 2026)
+
+- `20260912122135_security_hardening.sql` and `20260912122428_private_email_quota.sql` are deployed. Email handlers now reject anonymous/customer direct sends, load the stored recipient/content, escape substitutions, bound input bytes, and avoid logging customer payloads.
+- Saved orders create independent customer/admin jobs in `private.order_email_jobs`; the existing one-minute `push-dispatch` worker processes these alongside message emails/push. Browser-side automatic mail calls were removed. Explicit staff resends allow one per order/channel per five minutes, with a global hourly budget. Queue delivery is at-least-once, not exactly-once.
+- `20260912122430_activate_staff_mfa.sql` is **pending**: deploy the frontend with `StaffMfa` first, confirm TOTP enrollment/verification is enabled, then apply this migration. It requires `aal2` in `is_admin()` and revokes direct guest INSERT. The UI provides enrollment/verification before entering the workspace. Do not activate this before the enrollment UI is available.
+- The security migration puts sensitive counters/queues in `private`, enables RLS, revokes public access and exposes only guarded RPCs. An RLS-with-no-policy INFO on these internal tables is intentional deny-by-default.
+- `public/_headers` supplies CSP, anti-framing, nosniff, referrer and permissions policies when Netlify publishes the build. Keep the sandboxed email-template preview working when adjusting CSP. Never enable unsafe script execution just to fix a blocked resource.
+- npm audit is clean after upgrading jsPDF, React Router and Vite. Node 22 (minimum 22.12) is required; `.nvmrc` selects 22. Lockfiles must be committed. Test transforms use Vite's Oxc API.
+- Supabase leaked-password protection still needs enabling in the dashboard; the connector cannot change Auth settings and the browser was not signed in. Do not blanket-push the partial local Auth config.
+- MFA factor resets require identity verification by the Supabase project administrator. Keep a separate secured project-admin recovery route; do not add a public MFA bypass or weaken RLS for recovery.
+- See `supabase/SECURITY_ROLLOUT.md` for deployment order, checks and remaining verification.

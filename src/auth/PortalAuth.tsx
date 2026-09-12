@@ -12,6 +12,7 @@ type Access = {
   user: User | null;
   role: Role | null;
   loading: boolean;
+  mfaVerified: boolean;
   error: string | null;
   refresh: () => void;
 };
@@ -21,6 +22,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     user: null,
     role: null,
     loading: true,
+    mfaVerified: false,
     error: null,
   });
   useEffect(() => {
@@ -35,7 +37,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
         } = await supabase.auth.getUser();
         if (!alive || current !== generation) return;
         if (!user || error) {
-          setState({ user: null, role: null, loading: false, error: null });
+          setState({ user: null, role: null, loading: false, mfaVerified: false, error: null });
           return;
         }
         const result = await supabase
@@ -44,7 +46,10 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
           .eq("user_id", user.id)
           .maybeSingle();
         if (!alive || current !== generation) return;
+        const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (!alive || current !== generation) return;
         setState({
+          mfaVerified: !assurance.error && assurance.data.currentLevel === 'aal2',
           user,
           loading: false,
           role: !result.error && result.data?.active ? result.data.role : null,
@@ -58,6 +63,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
             user: null,
             role: null,
             loading: false,
+            mfaVerified: false,
             error: "Connection unavailable.",
           });
       }
@@ -70,7 +76,7 @@ export function PortalAuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         generation++;
-        setState({ user: null, role: null, loading: false, error: null });
+        setState({ user: null, role: null, loading: false, mfaVerified: false, error: null });
       } else setTimeout(run, 0);
     });
     run();

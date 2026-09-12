@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { transformWithEsbuild } from 'vite';
+import { transformWithOxc } from 'vite';
 async function load(path) {
  const source = await readFile(new URL(path, import.meta.url), 'utf8');
- const {code} = await transformWithEsbuild(source, path, {loader:'ts',format:'esm'});
+ const {code} = await transformWithOxc(source, path, {loader:'ts',format:'esm'});
  return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 }
 const {authMessages} = await load('../supabase/functions/auth-email/messages.ts');

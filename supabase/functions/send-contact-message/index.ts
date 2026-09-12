@@ -1,3 +1,5 @@
+import { readJson, RequestError } from '../_shared/request.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { mailResponse } from '../_shared/zoho-mail.ts';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
@@ -22,7 +24,10 @@ serve(async (req) => {
       );
     }
 
-    const { name, email, message } = await req.json();
+    if(req.method!=='POST')return new Response('Method not allowed',{status:405,headers:corsHeaders});
+    const { name, email, message } = await readJson(req,8000);
+    if(typeof name!=='string'||typeof email!=='string'||typeof message!=='string'||name.length>150||email.length>254||message.length>4000)
+      return new Response('Invalid contact details',{status:400,headers:corsHeaders});
 
     // Validate required fields
     if (!name?.trim() || !email?.trim() || !message?.trim()) {
@@ -40,6 +45,10 @@ serve(async (req) => {
       );
     }
 
+    const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
+    const {data:allowed,error:limitError}=await admin.rpc('claim_contact_email',{email_key:email.trim().toLowerCase()});
+    if(limitError)return new Response('Service temporarily unavailable',{status:503,headers:corsHeaders});
+    if(!allowed)return new Response('Message limit reached. Please try again later.',{status:429,headers:corsHeaders});
     const fromEmail = Deno.env.get('ZOHO_FROM_EMAIL') || 'Sugar Mama Cookie Co <no-reply@sugarmamacookieco.com.au>';
     const toEmail = 'hello@sugarmamacookieco.com.au';
 
@@ -103,7 +112,7 @@ serve(async (req) => {
       </div>
     `;
 
-    console.log(`[${now.toISOString()}] Sending contact message from ${email}`);
+    console.log('contact_email_requested');
 
     const res = await mailResponse({
         from: fromEmail,
@@ -130,7 +139,8 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
-    console.error('Error processing contact message:', err);
+    if(err instanceof RequestError)return Response.json({error:err.message},{status:err.status,headers:corsHeaders});
+    console.error('contact_email_failed');
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

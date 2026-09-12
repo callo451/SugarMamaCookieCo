@@ -38,6 +38,9 @@ Deno.serve(async (req) => {
     .single();
   if (ownerError || owner?.role !== "owner" || !owner.active)
     return respond({ error: "Only the owner can manage users" }, 403);
+  const caller = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false}});
+  const {data:verifiedStaff,error:assuranceError}=await caller.rpc('is_admin');
+  if(assuranceError||!verifiedStaff)return respond({error:'Complete two-step verification before managing the team'},403);
   try {
     const { action, email, userId } = await req.json();
     if (action === "list") {

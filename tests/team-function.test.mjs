@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { transformWithEsbuild } from "vite";
+import { transformWithOxc } from "vite";
 const source = await readFile(
   new URL("../supabase/functions/manage-team/index.ts", import.meta.url),
   "utf8",
@@ -9,9 +9,11 @@ const source = await readFile(
 let handler;
 let actorRole = "owner";
 let actorActive = true;
+let verified = true;
 let inviteCount = 0;
 let updateCount = 0;
 const mock = {
+  rpc: async () => ({data:verified,error:null}),
   auth: {
     getUser: async (token) => ({
       data: { user: token === "valid" ? { id: "owner" } : null },
@@ -70,7 +72,7 @@ globalThis.Deno = {
     handler = fn;
   },
 };
-const code = await transformWithEsbuild(
+const code = await transformWithOxc(
   source.replace(
     /import \{ createClient \} from [^;]+;/,
     "const createClient=globalThis.__testCreateClient;",
@@ -138,3 +140,5 @@ test("invalid invitation input rejected", async () => {
   );
   assert.equal(inviteCount, 1);
 });
+
+test("password-only owner cannot manage team",async()=>{verified=false;assert.equal((await request({action:'invite',email:'no@example.test'})).status,403);verified=true;});

@@ -1,4 +1,4 @@
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MessengerButton from './components/MessengerButton';
@@ -8,7 +8,7 @@ import Gallery from './pages/Gallery';
 import QuoteBuilder from './pages/QuoteBuilder';
 import Cart from './pages/Cart';
 import Orders from './pages/Orders';
-import Checkout from './pages/Checkout';
+
 import AdminDashboard from './pages/AdminDashboard';
 import Users from './pages/Users';
 import Activity from './pages/admin/Activity';
@@ -89,7 +89,7 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/quote-builder" element={<QuoteBuilder />} />
             <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/checkout" element={<Navigate to="/quote-builder" replace />} />
 
           </Route>
         </Routes>

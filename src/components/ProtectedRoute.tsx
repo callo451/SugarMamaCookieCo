@@ -1,10 +1,11 @@
+import StaffMfa from './StaffMfa';
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { usePortalAuth } from "../auth/PortalAuth";
 import { stopDeviceNotifications } from "../lib/portal";
 import { supabase } from "../lib/supabase";
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { loading, user, role, error, refresh } = usePortalAuth();
+  const { loading, user, role, error, refresh, mfaVerified } = usePortalAuth();
   const location = useLocation();
   if (loading)
     return (
@@ -41,5 +42,6 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
         </div>
       </div>
     );
+  if (!mfaVerified) return <StaffMfa onVerified={refresh} />;
   return <>{children}</>;
 }
