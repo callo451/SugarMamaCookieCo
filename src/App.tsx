@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MessengerButton from './components/MessengerButton';
 import Home from './pages/Home';
+import Privacy from './pages/Privacy';
 import Gallery from './pages/Gallery';
 import QuoteBuilder from './pages/QuoteBuilder';
 import Cart from './pages/Cart';
@@ -85,6 +86,7 @@ function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/gallery" element={<Gallery />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/quote-builder" element={<QuoteBuilder />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />

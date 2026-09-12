@@ -27,7 +27,7 @@ React 18 + TypeScript + Vite 5 + Tailwind CSS 3 + Supabase (Postgres, Auth, Stor
 
 ### Routing (src/App.tsx)
 
-- Public routes: `/` (Home), `/gallery`, `/quote-builder`, `/cart`, `/checkout`.
+- Public routes: `/` (Home), `/gallery`, `/quote-builder`, `/cart`, `/checkout`, `/privacy`.
 - Staff authentication: `/login`, `/admin/login`, `/admin/set-password`, `/auth/set-password`.
 - Admin routes share `<ProtectedRoute>` and `<AdminLayout>`: `/admin` (overview), `/admin/orders`, `/admin/orders/:id`, `/admin/users`, `/admin/activity`, `/admin/messages`, `/admin/production`, `/admin/calendar`, `/admin/customers`, `/admin/settings`.
 - Customer authentication: `/account/login`, `/account/callback`, `/account/set-password`.
@@ -54,6 +54,7 @@ One browser client, `supabase`, uses the public anon key and the current user's 
 - **Customer directory:** `/admin/customers` combines paginated orders with the bakery-only `customer_directory_accounts` RPC. Includes accounts without orders, verified/unverified status, guest customers, quote/order counts and completed-order value. `src/lib/customerDirectory.ts` groups by persisted ownership first, otherwise verified normalized email. Unverified accounts are not merged with guest history. Team membership records exclude logins from portal customer counts; team accounts with orders remain labelled in the directory. Pending quotes and cancelled orders are excluded from completed-order value, which is not proof of payment.
 - **Production:** `/admin/production` and `/admin/calendar` use collection dates in Melbourne time. Completed/cancelled orders leave the active schedule. The branded print kitchen sheet uses the same typography and colours as the site and PDFs.
 - **Notifications:** Order inserts and meaningful updates create transactional events and durable push jobs. A one-minute cron invokes `push-dispatch`, with leases, retries and delivery receipts. Delivery is at-least-once, not guaranteed instant. On supported iOS, install the HTTPS admin portal to the Home Screen and enable notifications in Settings. Real-device delivery requires separate testing.
+- **Privacy:** `src/pages/Privacy.tsx` provides the public policy, linked from the header, footer and customer sign-in. Update it when providers or data practices change.
 - **Data fetching:** Direct hooks with loading/error state; no React Query or SWR. Customer directory explicitly pages past the API row limit. Customer home has a 200-order limit and displays that limitation.
 
 ### Key Database Tables
